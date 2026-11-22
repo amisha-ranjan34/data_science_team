@@ -1,0 +1,21 @@
+[project]
+name = "backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "agno>=3.2.1",
+    "fastapi==0.115.6",
+    "groq>=1.7.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "python-dotenv>=1.2.4",
+    "python-multipart==0.0.20",
+    "scikit-learn>=1.5",
+    "uvicorn[standard]==0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]

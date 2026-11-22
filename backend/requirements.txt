@@ -1,0 +1,10 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.5
+agno>=2.2
+python-dotenv>=1.0
+# Install the package for the provider you use: groq, google-genai, openai or anthropic
+groq>=0.13
