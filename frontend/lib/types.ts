@@ -27,6 +27,8 @@ export interface ModelResult {
   cv_std: number;
   seconds: number;
   test: Record<string, number>;
+  tuned?: boolean;
+  params?: Record<string, number | string | null>;
 }
 
 export interface Step {
@@ -50,6 +52,24 @@ export interface PlanInfo {
   source: "ai" | "default";
 }
 
+export interface Finding {
+  severity: "high" | "medium" | "info";
+  title: string;
+  detail: string;
+}
+
+export interface Review {
+  verdict: "pass" | "caution" | "fail";
+  findings: Finding[];
+  checks: string[];
+}
+
+export interface Artifacts {
+  model: boolean;
+  code: boolean;
+  report: boolean;
+}
+
 export interface Result {
   task: Task;
   target: string;
@@ -63,6 +83,8 @@ export interface Result {
   recommendation: { model: string | null; verdict: "ok" | "no_signal"; reason: string; explanation?: string };
   plan?: PlanInfo;
   ai?: AiInfo;
+  review?: Review;
+  artifacts?: Artifacts;
 }
 
 export interface Run {

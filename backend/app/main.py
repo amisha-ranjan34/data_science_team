@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 
-import httpx
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from .llm import get_llm
@@ -17,7 +18,7 @@ from .profiling import load_csv, profile_dataframe
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "runs"
 MAX_BYTES = 20 * 1024 * 1024
-RUNS: dict[str, dict] = {}  # In-memory cache backed by on-disk persistence
+RUNS: dict[str, dict] = {}  # in-memory for Phase 1; Phase 4 moves this to a database
 
 app = FastAPI(title="Auto Data Science Team", version="0.1.0")
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
@@ -29,71 +30,25 @@ class TrainRequest(BaseModel):
     task: str | None = None  # "regression" or "classification"; defaults to the profiled guess
 
 
-class UrlRequest(BaseModel):
-    url: str
-
-
-def _run_file(run_id: str) -> Path:
-    return DATA_DIR / run_id / "run.json"
-
-
-def save_run(run: dict) -> None:
-    """Save run to in-memory dictionary and persist to disk as run.json."""
-    run_id = run["id"]
-    RUNS[run_id] = run
-    run_dir = DATA_DIR / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+def _save_state(run: dict) -> None:
     try:
-        with open(_run_file(run_id), "w", encoding="utf-8") as f:
-            json.dump(run, f, indent=2)
-    except Exception:
-        pass
+        (DATA_DIR / run["id"] / "state.json").write_text(json.dumps(run, default=str), encoding="utf-8")
+    except OSError:
+        pass  # saving is a convenience; never break a run because of it
 
 
 def get_run(run_id: str) -> dict:
-    """Get run from memory, disk run.json, or reconstruct from raw.csv if server restarted."""
     run = RUNS.get(run_id)
-    if run is not None:
-        return run
-
-    # 1. Try loading from on-disk run.json
-    run_path = _run_file(run_id)
-    if run_path.exists():
-        try:
-            with open(run_path, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-                RUNS[run_id] = saved
-                return saved
-        except Exception:
-            pass
-
-    # 2. If raw.csv exists, automatically re-profile and reconstruct the run
-    csv_path = DATA_DIR / run_id / "raw.csv"
-    if csv_path.exists():
-        try:
-            profile = profile_dataframe(load_csv(str(csv_path)))
-            reconstructed = {
-                "id": run_id,
-                "filename": "dataset.csv",
-                "status": "profiled",
-                "progress": 0.0,
-                "message": "",
-                "profile": profile,
-                "result": None,
-                "error": None,
-                "steps": [],
-            }
-            save_run(reconstructed)
-            return reconstructed
-        except Exception:
-            pass
-
-    raise HTTPException(404, "This run was not found. Upload the file again.")
-
-
-@app.get("/")
-def root():
-    return {"status": "ok", "app": "Auto Data Science Team API"}
+    if run is None and re.fullmatch(r"[a-f0-9]{12}", run_id):
+        state = DATA_DIR / run_id / "state.json"
+        if state.exists():  # the server restarted: bring the saved run back
+            run = json.loads(state.read_text(encoding="utf-8"))
+            if run["status"] == "running":
+                run.update(status="error", error="The server restarted while training. Press Train again.")
+            RUNS[run_id] = run
+    if run is None:
+        raise HTTPException(404, "This run was not found. Upload the file again.")
+    return run
 
 
 @app.get("/api/health")
@@ -128,7 +83,7 @@ async def create_run(file: UploadFile = File(...)):
         profile = profile_dataframe(load_csv(str(path)))
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    run = {
+    RUNS[run_id] = {
         "id": run_id,
         "filename": file.filename,
         "status": "profiled",
@@ -139,99 +94,34 @@ async def create_run(file: UploadFile = File(...)):
         "error": None,
         "steps": [],
     }
-    save_run(run)
-    return run
-
-
-@app.post("/api/runs/from-url")
-async def create_run_from_url(body: UrlRequest):
-    url = body.url.strip()
-    if not url.startswith(("http://", "https://")):
-        raise HTTPException(400, "Please provide a valid URL starting with http:// or https://")
-
-    # Determine a clean filename
-    clean_url = url.split("?")[0].split("#")[0]
-    filename = clean_url.rstrip("/").split("/")[-1] or "dataset.csv"
-    if not filename.lower().endswith((".csv", ".tsv", ".txt")):
-        filename += ".csv"
-
-    run_id = uuid.uuid4().hex[:12]
-    run_dir = DATA_DIR / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    path = run_dir / "raw.csv"
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            async with client.stream("GET", url) as response:
-                if response.status_code != 200:
-                    raise HTTPException(400, f"Failed to download dataset. Server returned HTTP {response.status_code}.")
-
-                size = 0
-                with open(path, "wb") as out:
-                    async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
-                        size += len(chunk)
-                        if size > MAX_BYTES:
-                            out.close()
-                            path.unlink(missing_ok=True)
-                            raise HTTPException(413, "The file exceeds the 20 MB size limit.")
-                        out.write(chunk)
-    except HTTPException:
-        raise
-    except httpx.RequestError as exc:
-        path.unlink(missing_ok=True)
-        raise HTTPException(400, f"Could not reach dataset URL: {str(exc)}") from exc
-    except Exception as exc:
-        path.unlink(missing_ok=True)
-        raise HTTPException(400, f"Error fetching dataset: {str(exc)}") from exc
-
-    try:
-        profile = profile_dataframe(load_csv(str(path)))
-    except ValueError as exc:
-        path.unlink(missing_ok=True)
-        raise HTTPException(400, str(exc)) from exc
-
-    run = {
-        "id": run_id,
-        "filename": filename,
-        "status": "profiled",
-        "progress": 0.0,
-        "message": "",
-        "profile": profile,
-        "result": None,
-        "error": None,
-        "steps": [],
-    }
-    save_run(run)
-    return run
+    _save_state(RUNS[run_id])
+    return RUNS[run_id]
 
 
 def _train(run_id: str, target: str, task: str) -> None:
-    run = get_run(run_id)
+    run = RUNS[run_id]
 
     def progress(fraction: float, message: str) -> None:
         run["progress"], run["message"] = fraction, message
-        save_run(run)
 
     def emit(step: dict) -> None:  # add a step, or update it when the id already exists
         for i, existing in enumerate(run["steps"]):
             if existing["id"] == step["id"]:
                 run["steps"][i] = step
-                save_run(run)
                 return
         run["steps"].append(step)
-        save_run(run)
 
     try:
         df = load_csv(str(DATA_DIR / run_id / "raw.csv"))
-        run["result"] = run_team(df, target, task, emit, progress)
+        run["result"] = run_team(df, target, task, emit, progress, artifact_dir=DATA_DIR / run_id / "artifacts")
         run["status"] = "done"
-        save_run(run)
     except Exception as exc:  # surfaced to the UI as a readable message
         run["error"] = str(exc) if isinstance(exc, ValueError) else "Training failed unexpectedly. Check the server logs."
         run["status"] = "error"
-        save_run(run)
         if not isinstance(exc, ValueError):
+            _save_state(run)
             raise
+    _save_state(run)
 
 
 @app.post("/api/runs/{run_id}/train", status_code=202)
@@ -252,7 +142,6 @@ def train(run_id: str, body: TrainRequest, background: BackgroundTasks):
 
         task = infer_task(load_csv(str(DATA_DIR / run_id / "raw.csv"))[body.target])
     run.update(status="running", progress=0.0, message="Starting", result=None, error=None, steps=[])
-    save_run(run)
     background.add_task(_train, run_id, body.target, task)
     return {"status": "running"}
 
@@ -260,3 +149,22 @@ def train(run_id: str, body: TrainRequest, background: BackgroundTasks):
 @app.get("/api/runs/{run_id}")
 def read_run(run_id: str):
     return get_run(run_id)
+
+
+DOWNLOADS = {
+    "model": ("model.joblib", "application/octet-stream"),
+    "code": ("train_model.py", "text/x-python"),
+    "report": ("report.md", "text/markdown"),
+}
+
+
+@app.get("/api/runs/{run_id}/download/{kind}")
+def download(run_id: str, kind: str):
+    get_run(run_id)  # also validates the id
+    if kind not in DOWNLOADS:
+        raise HTTPException(404, "Unknown file type.")
+    name, media = DOWNLOADS[kind]
+    path = DATA_DIR / run_id / "artifacts" / name
+    if not path.exists():
+        raise HTTPException(404, "This file was not created. No model is saved when no model beats the baseline.")
+    return FileResponse(path, filename=name, media_type=media)

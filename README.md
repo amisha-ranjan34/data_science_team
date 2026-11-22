@@ -2,6 +2,14 @@
 
 Upload a CSV. The app profiles it, cleans it, trains several models, tests them fairly and recommends one with a plain-language reason.
 
+## Phase 3 status
+- Reviewer agent (code checks): single-column leakage probe, train versus test gap, score plausibility, class balance, test set size, fold stability
+- Tuner: time-boxed random search on the best model, added to the leaderboard as a "(tuned)" row
+- Downloads: trained model (.joblib), a reproducible `train_model.py` script and a short `report.md`
+- Runs are saved to disk, so a server restart no longer loses them
+
+Set `TUNING_BUDGET_SECONDS=0` in `backend/.env` to switch tuning off.
+
 ## Phase 2 status
 - Agent team built with Agno: Profiler, Planner, Cleaner, Modeler and Advisor, with a live timeline in the UI
 - LLM agents (Profiler, Planner, Advisor) only write text and a validated plan. All ML work is tested code, and every agent has a rule-based fallback

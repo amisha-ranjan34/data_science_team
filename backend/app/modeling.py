@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import pandas as pd
 from sklearn.compose import TransformedTargetRegressor
+from sklearn.base import clone
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.ensemble import (
     HistGradientBoostingClassifier,
@@ -26,8 +28,11 @@ from sklearn.metrics import (
 from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 
+from . import artifacts
 from .pipeline import build_preprocessor, choose_columns
 from .profiling import MAX_ROWS
+from .review import build_review, single_feature_probe
+from .tuning import n_iterations, tune_pipeline
 
 SEED = 42
 PRIMARY = {"regression": "r2", "classification": "f1_macro"}
@@ -38,18 +43,18 @@ Emit = Callable[[dict], None]
 
 def candidates(task: str, n_rows: int):
     """(key, name, complexity, estimator). Lower complexity means easier to explain."""
-    trees = 50 if n_rows < 1000 else (100 if n_rows > 20_000 else 150)
+    trees = 100 if n_rows > 20_000 else 200
     if task == "regression":
         return [
             ("baseline", "Baseline (predicts the mean)", 0, DummyRegressor(strategy="mean")),
             ("linear", "Ridge regression", 1, Ridge(alpha=1.0)),
-            ("random_forest", "Random forest", 2, RandomForestRegressor(n_estimators=trees, random_state=SEED)),
+            ("random_forest", "Random forest", 2, RandomForestRegressor(n_estimators=trees, n_jobs=-1, random_state=SEED)),
             ("gradient_boosting", "Gradient boosting", 2, HistGradientBoostingRegressor(random_state=SEED)),
         ]
     return [
         ("baseline", "Baseline (predicts the majority class)", 0, DummyClassifier(strategy="most_frequent")),
         ("linear", "Logistic regression", 1, LogisticRegression(max_iter=1000)),
-        ("random_forest", "Random forest", 2, RandomForestClassifier(n_estimators=trees, random_state=SEED)),
+        ("random_forest", "Random forest", 2, RandomForestClassifier(n_estimators=trees, n_jobs=-1, random_state=SEED)),
         ("gradient_boosting", "Gradient boosting", 2, HistGradientBoostingClassifier(random_state=SEED)),
     ]
 
@@ -130,6 +135,8 @@ def run_experiment(
     progress: Progress | None = None,
     plan: dict | None = None,
     emit: Emit | None = None,
+    tune_budget: float = 0,
+    artifact_dir: Path | None = None,
 ) -> dict:
     progress = progress or (lambda f, m: None)
     emit = emit or (lambda e: None)
@@ -197,16 +204,21 @@ def run_experiment(
         cv = KFold(n_splits=5, shuffle=True, random_state=SEED)
 
     allowed = set(plan.get("models") or ["linear", "random_forest", "gradient_boosting"]) | {"baseline"}
+    def make_cv(seed: int):
+        return cv.__class__(n_splits=cv.get_n_splits(), shuffle=True, random_state=seed)
+
     cands = [c for c in candidates(task, len(X_train)) if c[0] in allowed]
+    built: dict[str, dict] = {}
     use_log = task == "regression" and plan.get("target_transform") == "log"
     models = []
     for i, (key, name, complexity, est) in enumerate(cands):
-        progress(0.15 + 0.8 * i / len(cands), f"Training {name}")
+        progress(0.15 + 0.6 * i / len(cands), f"Training {name}")
         sid = f"model:{key}"
         emit({"id": sid, "agent": "Modeler", "title": f"Training {name}", "status": "running", "detail": ""})
         if use_log and complexity > 0:  # the baseline stays on the original scale so the comparison is honest
             est = TransformedTargetRegressor(regressor=est, func=np.log1p, inverse_func=np.expm1, check_inverse=False)
         pipe = Pipeline([("prep", build_preprocessor(numeric, categorical)), ("model", est)])
+        built[name] = {"key": key, "pipe": clone(pipe)}
         t0 = time.perf_counter()
         scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring=PRIMARY[task])
         pipe.fit(X_train, y_train)
@@ -231,8 +243,68 @@ def run_experiment(
             }
         )
     models.sort(key=lambda m: m["cv_mean"], reverse=True)
+
+    # Tuner: search settings for the best model, then score the tuned version on fresh folds
+    if tune_budget and tune_budget > 0:
+        best = next(m for m in models if m["complexity"] > 0)
+        n_iter = n_iterations(best["seconds"], tune_budget)
+        if n_iter == 0:
+            emit({"id": "tuner", "agent": "Tuner", "title": "Tuning skipped", "status": "skipped", "detail": f"{best['name']} is too slow to tune inside the {int(tune_budget)}s budget."})
+        else:
+            progress(0.80, f"Tuning {best['name']}")
+            emit({"id": "tuner", "agent": "Tuner", "title": f"Tuning {best['name']}", "status": "running", "detail": f"Trying {n_iter} settings."})
+            try:
+                t0 = time.perf_counter()
+                base = built[best["name"]]
+                prefix = "model__regressor__" if use_log else "model__"
+                params = tune_pipeline(base["pipe"], base["key"], task, prefix, X_train, y_train, PRIMARY[task], n_iter, SEED)
+                tuned = clone(base["pipe"]).set_params(**{f"{prefix}{k}": v for k, v in params.items()})
+                unfitted = clone(tuned)
+                scores = cross_val_score(tuned, X_train, y_train, cv=make_cv(SEED + 1), scoring=PRIMARY[task])
+                tuned.fit(X_train, y_train)
+                row = {
+                    "name": f"{best['name']} (tuned)",
+                    "complexity": best["complexity"],
+                    "cv_mean": float(np.mean(scores)),
+                    "cv_std": float(np.std(scores)),
+                    "test": test_metrics(task, tuned, X_test, y_test),
+                    "seconds": round(time.perf_counter() - t0, 2),
+                    "tuned": True,
+                    "params": params,
+                }
+                models.append(row)
+                built[row["name"]] = {"key": base["key"], "pipe": unfitted}
+                warnings.append("Tuned scores are slightly optimistic because the search used the same training data. Trust the test column more.")
+                emit({"id": "tuner", "agent": "Tuner", "title": f"Tuned {best['name']}", "status": "done", "detail": f"{PRIMARY_LABEL[task]} {best['cv_mean']:.3f} to {row['cv_mean']:.3f} in {row['seconds']}s. Settings: " + ", ".join(f"{k}={v}" for k, v in params.items())})
+            except Exception as exc:
+                emit({"id": "tuner", "agent": "Tuner", "title": "Tuning skipped", "status": "skipped", "detail": f"The search did not finish ({exc.__class__.__name__}). The untuned models are used."})
+        models.sort(key=lambda m: m["cv_mean"], reverse=True)
+
     for rank, m in enumerate(models, start=1):
         m["rank"] = rank
+    rec = recommend(models, task)
+
+    # Reviewer: try to catch results that look better than they should
+    progress(0.92, "Reviewing the result")
+    emit({"id": "reviewer", "agent": "Reviewer", "title": "Reviewing the result", "status": "running", "detail": ""})
+    probe = single_feature_probe(X_train, y_train, task, numeric, categorical, PRIMARY[task])
+    majority = float(y_train.value_counts(normalize=True).max()) if task == "classification" else None
+    review = build_review(task, PRIMARY_LABEL[task], models, rec, len(X_test), probe, majority)
+    summary = "; ".join(f["title"] for f in review["findings"]) or f"All {len(review['checks'])} checks passed"
+    emit({"id": "reviewer", "agent": "Reviewer", "title": f"Review: {review['verdict']}", "status": "done" if review["verdict"] != "fail" else "error", "detail": summary + "."})
+
+    # Downloadable files
+    saved = {"model": False, "code": False, "report": False}
+    if artifact_dir and rec["verdict"] == "ok":
+        try:
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            chosen = built[rec["model"]]["pipe"]
+            artifacts.save_model(chosen, X, y, {"features": numeric + categorical, "target": target, "task": task}, artifact_dir / "model.joblib")
+            (artifact_dir / "train_model.py").write_text(artifacts.build_script(chosen, target, task, numeric, categorical), encoding="utf-8")
+            saved.update(model=True, code=True)
+        except Exception:
+            warnings.append("The model file could not be saved.")
+
     progress(1.0, "Done")
     return {
         "task": task,
@@ -244,5 +316,7 @@ def run_experiment(
         "dropped_columns": dropped,
         "warnings": warnings,
         "models": models,
-        "recommendation": recommend(models, task),
+        "recommendation": rec,
+        "review": review,
+        "artifacts": saved,
     }

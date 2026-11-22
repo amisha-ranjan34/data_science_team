@@ -6,11 +6,14 @@ so a bad LLM answer can never break a run: every agent step has a rule-based fal
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Callable, Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from . import artifacts
 from . import llm as llm_mod
 from .llm import LLMUnavailable
 from .modeling import run_experiment
@@ -75,8 +78,18 @@ def _reason(exc: Exception) -> str:
 
 # ---------- the run ----------
 
-def run_team(df: pd.DataFrame, target: str, task: str, emit: Emit, progress: Progress) -> dict:
+def run_team(
+    df: pd.DataFrame,
+    target: str,
+    task: str,
+    emit: Emit,
+    progress: Progress,
+    artifact_dir: Path | None = None,
+    tune_budget: float | None = None,
+) -> dict:
     llm = llm_mod.get_llm()
+    if tune_budget is None:
+        tune_budget = float(os.getenv("TUNING_BUDGET_SECONDS", "45"))  # 0 switches tuning off
 
     def step(id_: str, agent: str, title: str, status: str, detail: str = "") -> None:
         emit({"id": id_, "agent": agent, "title": title, "status": status, "detail": detail})
@@ -124,7 +137,7 @@ def run_team(df: pd.DataFrame, target: str, task: str, emit: Emit, progress: Pro
         step("planner", "Planner", "Plan ready", "skipped", f"{plan['rationale']} (AI planning skipped: {_reason(exc)})")
 
     # 3 and 4. Cleaner and Modeler run inside run_experiment and report through emit
-    result = run_experiment(df, target, task, progress, plan=plan, emit=emit)
+    result = run_experiment(df, target, task, progress, plan=plan, emit=emit, tune_budget=tune_budget, artifact_dir=artifact_dir)
     result["plan"] = plan
     result["ai"] = llm.info()
 
@@ -140,11 +153,20 @@ def run_team(df: pd.DataFrame, target: str, task: str, emit: Emit, progress: Pro
             "Advisor",
             "You explain machine learning results to a non-expert. Write 3 or 4 plain sentences about why the "
             "recommended model was chosen and what the user should watch out for. Use ONLY the numbers provided. "
-            "Do not invent numbers. If verdict is no_signal, say clearly that no model should be trusted. No markdown.",
-            json.dumps({"metric": result["primary_metric"], "recommendation": rec, "models": top, "warnings": result["warnings"], "plan": plan["rationale"]}),
+            "Do not invent numbers. If verdict is no_signal, say clearly that no model should be trusted. If the review has "
+            "findings, mention the most important one. No markdown.",
+            json.dumps({"metric": result["primary_metric"], "recommendation": rec, "models": top, "warnings": result["warnings"], "plan": plan["rationale"], "review": result["review"]}),
         )
         rec["explanation"] = text
         step("advisor", "Advisor", "Result explained", "done", text)
     except Exception as exc:
         step("advisor", "Advisor", "Result explained", "skipped", f"Used the rule-based explanation. ({_reason(exc)})")
+
+    if artifact_dir:
+        try:
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            (artifact_dir / "report.md").write_text(artifacts.build_report(result), encoding="utf-8")
+            result["artifacts"]["report"] = True
+        except Exception:
+            result["warnings"].append("The report file could not be saved.")
     return result

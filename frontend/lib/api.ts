@@ -28,16 +28,6 @@ export async function uploadCsv(file: File): Promise<Run> {
   return parse<Run>(await request(`${BASE}/api/runs`, { method: "POST", body: form }));
 }
 
-export async function createRunFromUrl(url: string): Promise<Run> {
-  return parse<Run>(
-    await request(`${BASE}/api/runs/from-url`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    })
-  );
-}
-
 export async function startTraining(id: string, target: string, task: Task): Promise<void> {
   await parse(
     await request(`${BASE}/api/runs/${id}/train`, {
@@ -55,3 +45,5 @@ export async function getRun(id: string): Promise<Run> {
 export async function getConfig(): Promise<{ ai: AiInfo }> {
   return parse(await request(`${BASE}/api/config`));
 }
+
+export const downloadUrl = (id: string, kind: "model" | "code" | "report") => `${BASE}/api/runs/${id}/download/${kind}`;
