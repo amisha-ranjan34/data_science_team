@@ -98,3 +98,17 @@ export interface Run {
   error: string | null;
   steps: Step[];
 }
+
+export interface User {
+  id: number;
+  email: string;
+}
+
+export interface RunSummary {
+  id: string;
+  filename: string;
+  status: "profiled" | "running" | "done" | "error";
+  target: string | null;
+  recommended: string | null;
+  created_at: string;
+}

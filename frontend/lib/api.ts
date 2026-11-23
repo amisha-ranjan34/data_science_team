@@ -1,49 +1,81 @@
-import type { AiInfo, Run, Task } from "./types";
+import type { AiInfo, Run, RunSummary, Task, User } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const TOKEN_KEY = "adst_token";
+const FILE_NAMES = { model: "model.joblib", code: "train_model.py", report: "report.md" } as const;
 
-async function parse<T>(res: Response): Promise<T> {
+export class AuthError extends Error {}
+
+export const getToken = () => (typeof window === "undefined" ? null : window.localStorage.getItem(TOKEN_KEY));
+const setToken = (t: string) => window.localStorage.setItem(TOKEN_KEY, t);
+export const clearToken = () => window.localStorage.removeItem(TOKEN_KEY);
+
+async function parse<T>(res: Response, authenticated = true): Promise<T> {
   if (!res.ok) {
     let detail = `Request failed (${res.status}).`;
     try {
       const body = await res.json();
       if (typeof body.detail === "string") detail = body.detail;
+      else if (Array.isArray(body.detail) && body.detail[0]?.msg) detail = body.detail[0].msg;
     } catch {}
+    if (res.status === 401 && authenticated) throw new AuthError(detail);
     throw new Error(detail);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
-async function request(url: string, init?: RequestInit): Promise<Response> {
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   try {
-    return await fetch(url, init);
+    return await fetch(`${BASE}${path}`, { ...init, headers });
   } catch {
     throw new Error("Cannot reach the server. Check that the backend is running on " + BASE + ".");
   }
 }
 
-export async function uploadCsv(file: File): Promise<Run> {
+const json = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+// ---- accounts
+async function authenticate(path: string, email: string, password: string): Promise<User> {
+  const data = await parse<{ token: string; user: User }>(await request(path, json({ email, password })), false);
+  setToken(data.token);
+  return data.user;
+}
+export const login = (email: string, password: string) => authenticate("/api/auth/login", email, password);
+export const register = (email: string, password: string) => authenticate("/api/auth/register", email, password);
+export const getMe = async () => parse<User>(await request("/api/auth/me"));
+
+// ---- runs
+export const uploadCsv = async (file: File): Promise<Run> => {
   const form = new FormData();
   form.append("file", file);
-  return parse<Run>(await request(`${BASE}/api/runs`, { method: "POST", body: form }));
-}
+  return parse<Run>(await request("/api/runs", { method: "POST", body: form }));
+};
+export const startTraining = async (id: string, target: string, task: Task): Promise<void> => {
+  await parse(await request(`/api/runs/${id}/train`, json({ target, task })));
+};
+export const getRun = async (id: string) => parse<Run>(await request(`/api/runs/${id}`));
+export const listRuns = async () => parse<RunSummary[]>(await request("/api/runs"));
+export const deleteRun = async (id: string) => parse<void>(await request(`/api/runs/${id}`, { method: "DELETE" }));
+export const getConfig = async (): Promise<{ ai: AiInfo }> => parse(await request("/api/config"));
 
-export async function startTraining(id: string, target: string, task: Task): Promise<void> {
-  await parse(
-    await request(`${BASE}/api/runs/${id}/train`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, task }),
-    })
-  );
+/** Downloads need the login token, so they go through fetch instead of a plain link. */
+export async function downloadFile(id: string, kind: keyof typeof FILE_NAMES): Promise<void> {
+  const res = await request(`/api/runs/${id}/download/${kind}`);
+  if (!res.ok) await parse(res);
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = FILE_NAMES[kind];
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
-
-export async function getRun(id: string): Promise<Run> {
-  return parse<Run>(await request(`${BASE}/api/runs/${id}`));
-}
-
-export async function getConfig(): Promise<{ ai: AiInfo }> {
-  return parse(await request(`${BASE}/api/config`));
-}
-
-export const downloadUrl = (id: string, kind: "model" | "code" | "report") => `${BASE}/api/runs/${id}/download/${kind}`;

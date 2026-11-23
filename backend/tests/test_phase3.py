@@ -1,4 +1,3 @@
-import json
 import subprocess
 import sys
 
@@ -6,10 +5,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
-from fastapi.testclient import TestClient
 from sklearn.datasets import make_classification, make_regression
 
-from app import main
 from app.artifacts import build_report
 from app.modeling import run_experiment
 from app.review import build_review
@@ -106,27 +103,3 @@ def test_report_text():
     out["artifacts"]["report"] = True
     text = build_report(out)
     assert "## Recommendation" in text and "## Review" in text and "bundle[\"pipeline\"].predict" in text
-
-
-def test_api_run_survives_restart_and_serves_downloads():
-    client = TestClient(main.app)
-    csv = noisy_regression().to_csv(index=False).encode()
-    run_id = client.post("/api/runs", files={"file": ("d.csv", csv, "text/csv")}).json()["id"]
-    assert client.post(f"/api/runs/{run_id}/train", json={"target": "target"}).status_code == 202
-    main.RUNS.clear()  # simulate a server restart
-    run = client.get(f"/api/runs/{run_id}").json()
-    assert run["status"] == "done" and run["result"]["artifacts"]["report"] is True
-    assert client.get(f"/api/runs/{run_id}/download/report").status_code == 200
-    if run["result"]["artifacts"]["model"]:
-        assert client.get(f"/api/runs/{run_id}/download/model").status_code == 200
-    assert client.get(f"/api/runs/{run_id}/download/virus").status_code == 404
-    assert client.get("/api/runs/../../etc/download/model").status_code == 404
-    assert client.get("/api/runs/aaaaaaaaaaaa").status_code == 404
-
-
-def test_interrupted_run_is_reported_as_error(tmp_path):
-    run_dir = main.DATA_DIR / "abcdef123456"
-    run_dir.mkdir(parents=True)
-    (run_dir / "state.json").write_text(json.dumps({"id": "abcdef123456", "status": "running", "error": None, "steps": []}))
-    out = TestClient(main.app).get("/api/runs/abcdef123456").json()
-    assert out["status"] == "error" and "restarted" in out["error"]

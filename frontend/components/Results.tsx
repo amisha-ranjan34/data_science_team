@@ -1,4 +1,6 @@
-import { downloadUrl } from "@/lib/api";
+"use client";
+import { useState } from "react";
+import { downloadFile } from "@/lib/api";
 import type { ModelResult, Result, Review, Step } from "@/lib/types";
 import Timeline from "./Timeline";
 
@@ -103,17 +105,33 @@ function ReviewCard({ review }: { review: Review }) {
 }
 
 function Downloads({ runId, result }: { runId: string; result: Result }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const a = result.artifacts;
   if (!a) return null;
-  const link = "rounded-lg border border-line bg-paper px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-accent hover:text-accent";
+
+  async function get(kind: "model" | "code" | "report") {
+    setBusy(kind);
+    setError(null);
+    try {
+      await downloadFile(runId, kind);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The download failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const btn = "rounded-lg border border-line bg-paper px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-accent hover:text-accent disabled:opacity-60";
   return (
     <section className="rounded-xl border border-line bg-surface p-4 sm:p-5">
       <h3 className="font-bold">Take it with you</h3>
       <div className="mt-3 flex flex-wrap gap-3">
-        {a.model && <a className={link} href={downloadUrl(runId, "model")}>Model (.joblib)</a>}
-        {a.code && <a className={link} href={downloadUrl(runId, "code")}>Training script (.py)</a>}
-        {a.report && <a className={link} href={downloadUrl(runId, "report")}>Report (.md)</a>}
+        {a.model && <button className={btn} disabled={busy !== null} onClick={() => get("model")}>{busy === "model" ? "Downloading" : "Model (.joblib)"}</button>}
+        {a.code && <button className={btn} disabled={busy !== null} onClick={() => get("code")}>{busy === "code" ? "Downloading" : "Training script (.py)"}</button>}
+        {a.report && <button className={btn} disabled={busy !== null} onClick={() => get("report")}>{busy === "report" ? "Downloading" : "Report (.md)"}</button>}
       </div>
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-danger">{error}</p>}
       {!a.model && <p className="mt-3 text-sm text-muted">No model file was saved because no model clearly beat the baseline.</p>}
       {a.model && <p className="mt-3 text-xs text-muted">The saved model is refit on every cleaned row. Scores above come from the train and test split.</p>}
     </section>

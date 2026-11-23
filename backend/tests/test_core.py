@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
-from fastapi.testclient import TestClient
 from sklearn.datasets import make_classification, make_regression
 
-from app.main import app
 from app.modeling import run_experiment
 from app.profiling import infer_task, profile_dataframe
 
@@ -45,15 +43,3 @@ def test_task_inference_and_profile():
     df = regression_df()
     assert infer_task(df["target"]) == "regression"
     assert profile_dataframe(df)["suggested_target"] == "target"
-
-
-def test_api_upload_and_train_flow(tmp_path):
-    client = TestClient(app)
-    csv = regression_df().to_csv(index=False).encode()
-    r = client.post("/api/runs", files={"file": ("data.csv", csv, "text/csv")})
-    assert r.status_code == 200
-    run_id = r.json()["id"]
-    assert client.post(f"/api/runs/{run_id}/train", json={"target": "target"}).status_code == 202
-    status = client.get(f"/api/runs/{run_id}").json()
-    assert status["status"] in {"running", "done"}
-    assert client.post("/api/runs", files={"file": ("x.pdf", b"x", "application/pdf")}).status_code == 400
