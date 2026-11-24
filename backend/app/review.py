@@ -56,7 +56,7 @@ def build_review(task: str, label: str, models: list[dict], rec: dict, n_test: i
         add("medium", "Training scores are much higher than test scores", f"{subject['name']} scored {subject['cv_mean']:.3f} in cross-validation but {subject['test'][test_key]:.3f} on the held-out test set. It may be overfitting, so expect weaker results on new data.")
 
     if subject["cv_mean"] >= 0.98:
-        add("high", "The score is suspiciously high", f"A {label} of {subject['cv_mean']:.3f} is rarely realistic on real data. Look for leakage or a target that is repeated in another column.")
+        add("medium", "The score is unusually high", f"A {label} of {subject['cv_mean']:.3f} can be genuine on an easy problem, but it is also what leakage looks like. Check that no column repeats or gives away the target.")
 
     if majority_share is not None and majority_share >= 0.9:
         add("medium", "The classes are very imbalanced", f"{majority_share:.0%} of rows belong to one class, so accuracy can look good while the model is useless. Judge the model by {label} and look at the minority class.")

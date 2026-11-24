@@ -155,7 +155,8 @@ def run_team(
             "recommended model was chosen and what the user should watch out for. Use ONLY the numbers provided. "
             "Do not invent numbers. If verdict is no_signal, say clearly that no model should be trusted. If the review has "
             "findings, mention the most important one. No markdown.",
-            json.dumps({"metric": result["primary_metric"], "recommendation": rec, "models": top, "warnings": result["warnings"], "plan": plan["rationale"], "review": result["review"]}),
+            json.dumps({"metric": result["primary_metric"], "recommendation": rec, "models": top, "warnings": result["warnings"], "plan": plan["rationale"], "review": result["review"],
+                        "redteam": [{"attack": a["name"], "severity": a["severity"], "result": a["result"]} for a in (result.get("redteam") or {}).get("attacks", [])]}),
         )
         rec["explanation"] = text
         step("advisor", "Advisor", "Result explained", "done", text)

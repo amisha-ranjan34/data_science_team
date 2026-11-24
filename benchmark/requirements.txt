@@ -1,0 +1,4 @@
+# Only needed to run the benchmark. FLAML is the AutoML system we compare against.
+# If your machine blocks compiled packages (lightgbm, xgboost), the script skips FLAML and says so.
+-r ../backend/requirements.txt
+flaml[automl]>=2.3

@@ -79,3 +79,23 @@ export async function downloadFile(id: string, kind: keyof typeof FILE_NAMES): P
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+/** Live updates for a running run (server-sent events over fetch, so the login header can be sent). */
+export async function streamRun(id: string, onRun: (run: Run) => void, signal: AbortSignal): Promise<void> {
+  const res = await request(`/api/runs/${id}/events`, { signal, headers: { Accept: "text/event-stream" } });
+  if (!res.ok || !res.body) await parse(res);
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    const messages = buffer.split("\n\n");
+    buffer = messages.pop() ?? "";
+    for (const message of messages) {
+      const data = message.split("\n").filter((l) => l.startsWith("data: ")).map((l) => l.slice(6)).join("");
+      if (data && data !== "{}") onRun(JSON.parse(data) as Run);
+    }
+  }
+}

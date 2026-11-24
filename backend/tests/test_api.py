@@ -148,3 +148,36 @@ def test_health_reports_database(client):
 def test_postgres_urls_are_normalised():
     assert db.normalize_url("postgres://u:p@h/d") == "postgresql+psycopg://u:p@h/d"
     assert db.normalize_url("sqlite:///x.db") == "sqlite:///x.db"
+
+
+def sse_payloads(response):
+    return [json.loads(line[6:]) for line in response.iter_lines() if line.startswith("data: ")]
+
+
+def test_events_stream_a_finished_run_once_and_close(client, auth):
+    run_id = upload(client, auth).json()["id"]
+    client.post(f"/api/runs/{run_id}/train", json={"target": "target"}, headers=auth)
+    with client.stream("GET", f"/api/runs/{run_id}/events", headers=auth) as r:
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+        events = sse_payloads(r)
+    assert len(events) == 1 and events[0]["status"] == "done" and events[0]["result"]["redteam"] is not None
+
+
+def test_events_follow_a_running_run_until_it_finishes(client, auth):
+    import threading
+
+    run_id = upload(client, auth).json()["id"]
+    db.update_run(run_id, status="running", progress=0.2, message="Training")
+    timer = threading.Timer(0.8, lambda: db.update_run(run_id, status="done", progress=1.0, message="Done"))
+    timer.start()
+    with client.stream("GET", f"/api/runs/{run_id}/events", headers=auth) as r:
+        events = sse_payloads(r)
+    timer.join()
+    assert [e["status"] for e in events] == ["running", "done"] and events[0]["progress"] == 0.2
+
+
+def test_events_respect_ownership_and_login(client, auth):
+    run_id = upload(client, auth).json()["id"]
+    other = register(client, "grace@example.com")
+    assert client.get(f"/api/runs/{run_id}/events", headers=other).status_code == 404
+    assert client.get(f"/api/runs/{run_id}/events").status_code == 401

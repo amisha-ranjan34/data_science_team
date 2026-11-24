@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import shutil
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -232,6 +233,35 @@ def train(run_id: str, body: TrainRequest, background: BackgroundTasks, user: db
 @app.get("/api/runs/{run_id}")
 def read_run(run_id: str, user: db.User = Depends(current_user), s: Session = Depends(db.get_session)):
     return db.run_to_dict(owned_run(run_id, user, s))
+
+
+@app.get("/api/runs/{run_id}/events")
+def run_events(run_id: str, user: db.User = Depends(current_user)):
+    """Server-sent events: a fresh copy of the run whenever it changes, until it stops running."""
+    with db.session_scope() as s:
+        owned_run(run_id, user, s)
+
+    def stream():
+        last, last_ping, deadline = None, time.monotonic(), time.monotonic() + 30 * 60
+        while time.monotonic() < deadline:
+            with db.session_scope() as s:
+                run = s.get(db.Run, run_id)
+                if run is None:
+                    yield "event: gone\ndata: {}\n\n"
+                    return
+                marker, payload, status = (run.updated_at, run.status), db.run_to_dict(run), run.status
+            if marker != last:
+                last = marker
+                yield f"data: {json.dumps(payload, default=str)}\n\n"
+            if status != "running":
+                return
+            if time.monotonic() - last_ping > 15:  # keeps proxies from closing a quiet connection
+                last_ping = time.monotonic()
+                yield ": ping\n\n"
+            time.sleep(0.4)
+
+    headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    return StreamingResponse(stream(), media_type="text/event-stream", headers=headers)
 
 
 @app.delete("/api/runs/{run_id}", status_code=204)

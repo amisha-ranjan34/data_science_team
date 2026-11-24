@@ -7,7 +7,7 @@ import Progress from "@/components/Progress";
 import Results from "@/components/Results";
 import RunHistory from "@/components/RunHistory";
 import Stepper from "@/components/Stepper";
-import { AuthError, clearToken, deleteRun, getConfig, getMe, getRun, getToken, listRuns, startTraining, uploadCsv } from "@/lib/api";
+import { AuthError, clearToken, deleteRun, getConfig, getMe, getRun, getToken, listRuns, startTraining, streamRun, uploadCsv } from "@/lib/api";
 import type { AiInfo, Run, RunSummary, Task, User } from "@/lib/types";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
@@ -47,10 +47,30 @@ export default function Home() {
 
   const runId = run?.id;
   const running = run?.status === "running";
+  // Live updates over a stream. If the stream is unavailable or drops, fall back to polling once a second.
   useEffect(() => {
     if (!runId || !running) return;
-    const timer = setInterval(() => getRun(runId).then(setRun).catch(fail), 1000);
-    return () => clearInterval(timer);
+    const ctrl = new AbortController();
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const poll = () => {
+      timer = setInterval(() => getRun(runId).then(setRun).catch(fail), 1000);
+    };
+    streamRun(runId, setRun, ctrl.signal)
+      .then(async () => {
+        if (ctrl.signal.aborted) return;
+        const latest = await getRun(runId);
+        setRun(latest);
+        if (latest.status === "running") poll();
+      })
+      .catch((e) => {
+        if (ctrl.signal.aborted) return;
+        if (e instanceof AuthError) fail(e);
+        else poll();
+      });
+    return () => {
+      ctrl.abort();
+      if (timer) clearInterval(timer);
+    };
   }, [runId, running, fail]);
 
   const reset = () => { setRun(null); setError(null); };

@@ -7,6 +7,7 @@ const AGENT_COLORS: Record<string, string> = {
   Modeler: "bg-accent-soft text-accent-dark",
   Tuner: "bg-[#E8EEF3] text-[#35506B]",
   Reviewer: "bg-[#FBE9E7] text-[#9B2C1F]",
+  "Red team": "bg-[#F6DCDC] text-[#7A1717]",
   Advisor: "bg-[#FBEFD9] text-[#8A5400]",
 };
 

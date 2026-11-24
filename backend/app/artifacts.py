@@ -131,6 +131,11 @@ def build_report(result: dict) -> str:
         lines.append("All review checks passed: " + ", ".join(review.get("checks", [])) + ".")
     for w in result["warnings"]:
         lines.append(f"- Note: {w}")
+    red = result.get("redteam")
+    if red:
+        lines += ["", "## Stress tests", ""]
+        for a in red["attacks"]:
+            lines.append(f"- **{a['name']} ({a['severity']}).** {a['what']} {a['result']}")
     lines += [
         "",
         "## Use the model",

@@ -31,6 +31,7 @@ from sklearn.pipeline import Pipeline
 from . import artifacts
 from .pipeline import build_preprocessor, choose_columns
 from .profiling import MAX_ROWS
+from .redteam import run_redteam
 from .review import build_review, single_feature_probe
 from .tuning import n_iterations, tune_pipeline
 
@@ -293,6 +294,22 @@ def run_experiment(
     summary = "; ".join(f["title"] for f in review["findings"]) or f"All {len(review['checks'])} checks passed"
     emit({"id": "reviewer", "agent": "Reviewer", "title": f"Review: {review['verdict']}", "status": "done" if review["verdict"] != "fail" else "error", "detail": summary + "."})
 
+    # Red team: attack the recommended model with noise, missing data, unseen categories and weak subgroups
+    redteam = None
+    if rec["verdict"] == "ok":
+        progress(0.95, "Red team is attacking the model")
+        emit({"id": "redteam", "agent": "Red team", "title": "Attacking the recommended model", "status": "running", "detail": ""})
+        try:
+            fitted = clone(built[rec["model"]]["pipe"]).fit(X_train, y_train)
+            redteam = run_redteam(fitted, X_train, y_train, X_test, y_test, task, numeric, categorical, PRIMARY_LABEL[task])
+            weak = [a["name"] for a in redteam["attacks"] if a["severity"] != "pass"]
+            emit({"id": "redteam", "agent": "Red team", "title": f"Stress test: {redteam['verdict']}", "status": "error" if redteam["verdict"] == "fail" else "done",
+                  "detail": ("Weak spots: " + ", ".join(weak) + ".") if weak else f"The model held up against all {len(redteam['attacks'])} attacks."})
+        except Exception as exc:
+            emit({"id": "redteam", "agent": "Red team", "title": "Stress test skipped", "status": "skipped", "detail": f"The attacks did not finish ({exc.__class__.__name__})."})
+    else:
+        emit({"id": "redteam", "agent": "Red team", "title": "Stress test skipped", "status": "skipped", "detail": "There is no recommended model to attack."})
+
     # Downloadable files
     saved = {"model": False, "code": False, "report": False}
     if artifact_dir and rec["verdict"] == "ok":
@@ -318,5 +335,6 @@ def run_experiment(
         "models": models,
         "recommendation": rec,
         "review": review,
+        "redteam": redteam,
         "artifacts": saved,
     }

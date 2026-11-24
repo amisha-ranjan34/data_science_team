@@ -8,6 +8,9 @@ Upload a CSV. A team of agents profiles it, cleans it, trains and tunes several 
 - **Any CSV in, a decision out.** Detects the target and problem type, then compares a baseline, a linear model, a random forest and gradient boosting.
 - **Honest by design.** Leak-safe pipelines (everything is fitted on training data only), duplicates removed before the split, and a recommendation rule that prefers the simpler model when scores are within one standard deviation. It says so when no model beats the baseline.
 - **A Reviewer that argues back.** Six code-based checks catch leakage, overfitting, impossible scores, imbalance, tiny test sets and unstable folds.
+- **A Red team that attacks the winner.** Before you trust the recommended model, it is hit with noisy inputs, missing values, unseen categories, weak subgroups and single-column dependence, and the damage is reported.
+- **Measured against a real AutoML library.** A benchmark on public datasets compares it with FLAML under the same time budget (see [benchmark/RESULTS.md](benchmark/RESULTS.md)).
+- **Live progress.** The timeline streams over server-sent events, with polling as a fallback.
 - **Agents with a safety net.** LLM agents plan and explain, tested code does the ML, and every agent has a rule-based fallback, so a bad or missing AI answer never breaks a run.
 - **Take it with you.** Download the trained model, a reproducible `train_model.py` and a short report.
 - **Real app basics.** Accounts, per-user run history, daily limits, health check, Docker and CI.
@@ -24,7 +27,8 @@ flowchart LR
     C --> M["Modeler"]
     M --> T["Tuner"]
     T --> R["Reviewer"]
-    R --> A["Advisor (AI)"]
+    R --> RT["Red team"]
+    RT --> A["Advisor (AI)"]
     P -.-> LLM[("Groq, Gemini, OpenAI or Anthropic via Agno")]
     PL -.-> LLM
     A -.-> LLM
@@ -38,6 +42,7 @@ flowchart LR
 | Modeler | Cross-validates and tests each model | No |
 | Tuner | Time-boxed random search on the best model | No |
 | Reviewer | Leakage, overfitting and stability checks | No |
+| Red team | Stress-tests the recommended model with five attacks | No |
 | Advisor | Explains the result in plain language using only measured numbers | Yes, with fallback |
 
 ## Quick start (local)
@@ -86,16 +91,24 @@ Frontend on http://localhost:3000, API on http://localhost:8000. Data lives in t
 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Accounts |
 | `POST /api/runs` | Upload a CSV and get its profile |
 | `POST /api/runs/{id}/train` | Start training in the background |
-| `GET /api/runs/{id}` | Progress, timeline steps and results (poll this) |
+| `GET /api/runs/{id}` | Progress, timeline steps and results |
+| `GET /api/runs/{id}/events` | The same data as a live server-sent event stream |
 | `GET /api/runs`, `DELETE /api/runs/{id}` | History and deletion |
 | `GET /api/runs/{id}/download/{model,code,report}` | Files |
 | `GET /api/health`, `GET /api/config` | Health check and AI status |
 
 Interactive docs at `/docs` when the backend runs.
 
+## Benchmark
+```bash
+pip install -r benchmark/requirements.txt
+python benchmark/run_benchmark.py --seeds 3 --budget 15
+```
+On 12 public datasets (3 splits each) it lands roughly on par with FLAML under the same time budget: 5 wins and 7 losses, median score difference -0.006, and within 0.02 of the best method on 9 of 12. The extra value is the Reviewer and Red team on top, not a higher score. Results, the protocol and the caveats are in [benchmark/RESULTS.md](benchmark/RESULTS.md). The benchmark needs FLAML, which pulls in compiled packages, so it is kept out of the app's own requirements.
+
 ## Tests and CI
 ```bash
-cd backend && uv run python -m pytest     # 41 tests: ML pipeline, agents, reviewer, accounts, ownership, limits
+cd backend && uv run python -m pytest     # ML pipeline, agents, reviewer, red team, accounts, ownership, limits, streaming
 cd frontend && npx tsc --noEmit && npm run build
 ```
 GitHub Actions runs both on every push and pull request (`.github/workflows/ci.yml`).
@@ -112,6 +125,7 @@ A common free setup: frontend on Vercel, backend from `backend/Dockerfile` on Re
 - Passwords are hashed with scrypt. Login tokens are signed JWTs valid for 7 days and kept in the browser's local storage, which a cross-site scripting bug could expose. Moving to httpOnly cookies is the next hardening step.
 - Every run is tied to its owner. Other users get a 404, not a 403.
 - Limits: 20 MB per file, a daily upload cap per user and one training at a time per user.
+- Each open live stream holds one server thread until the run ends, which is fine for a demo but would need an async design for heavy traffic.
 - There is no email verification or password reset yet.
 - The AI provider receives only column names, types, summary statistics and class labels, never raw rows.
 
@@ -124,9 +138,11 @@ backend/app/team.py        the agent team
 backend/app/llm.py         Agno model access with fallbacks
 backend/app/modeling.py    training, tuning, recommendation
 backend/app/review.py      the Reviewer checks
+backend/app/redteam.py     the Red team stress tests
+benchmark/                 benchmark against FLAML on public datasets
 backend/app/artifacts.py   model, script and report files
 frontend/                  Next.js (App Router) and Tailwind
 ```
 
 ## Roadmap
-Live streaming with SSE, httpOnly cookies, email verification, object storage for artifacts, red-team agent and an AutoML benchmark.
+httpOnly cookies, email verification, object storage for artifacts, a what-if chat that re-runs only the affected steps, and a larger benchmark with more datasets and splits.

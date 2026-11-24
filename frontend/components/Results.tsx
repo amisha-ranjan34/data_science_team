@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { downloadFile } from "@/lib/api";
-import type { ModelResult, Result, Review, Step } from "@/lib/types";
+import type { ModelResult, RedTeam, Result, Review, Step } from "@/lib/types";
 import Timeline from "./Timeline";
 
 const METRIC_LABELS: Record<string, string> = {
@@ -104,6 +104,41 @@ function ReviewCard({ review }: { review: Review }) {
   );
 }
 
+const RED_VERDICT = {
+  pass: { label: "Survived", cls: "bg-good text-white" },
+  caution: { label: "Some weak spots", cls: "bg-warn text-white" },
+  fail: { label: "Broke under stress", cls: "bg-danger text-white" },
+} as const;
+const ATTACK = {
+  pass: { label: "Held up", cls: "text-good" },
+  medium: { label: "Weak spot", cls: "text-warn" },
+  high: { label: "Broke", cls: "text-danger" },
+} as const;
+
+function RedTeamCard({ red }: { red: RedTeam }) {
+  const v = RED_VERDICT[red.verdict];
+  return (
+    <section className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="font-bold">Red team stress tests</h3>
+        <span className={"rounded-full px-2.5 py-0.5 text-xs font-bold " + v.cls}>{v.label}</span>
+      </div>
+      <p className="mt-2 text-sm text-muted">We attacked the recommended model on its test rows. Starting {red.metric}: {red.baseline_score.toFixed(3)}.</p>
+      <ul className="mt-3 space-y-3">
+        {red.attacks.map((a) => (
+          <li key={a.name} className="text-sm">
+            <p className="font-semibold">
+              {a.name} <span className={"ml-2 text-xs font-bold uppercase " + ATTACK[a.severity].cls}>{ATTACK[a.severity].label}</span>
+            </p>
+            <p className="mt-0.5 text-muted">{a.what}</p>
+            <p className="mt-0.5 leading-relaxed">{a.result}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Downloads({ runId, result }: { runId: string; result: Result }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,6 +186,7 @@ export default function Results({ result, steps, runId, onReset }: { result: Res
       </section>
 
       {result.review && <ReviewCard review={result.review} />}
+      {result.redteam && <RedTeamCard red={result.redteam} />}
 
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">

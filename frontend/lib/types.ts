@@ -64,6 +64,20 @@ export interface Review {
   checks: string[];
 }
 
+export interface Attack {
+  name: string;
+  severity: "pass" | "medium" | "high";
+  what: string;
+  result: string;
+}
+
+export interface RedTeam {
+  verdict: "pass" | "caution" | "fail";
+  attacks: Attack[];
+  baseline_score: number;
+  metric: string;
+}
+
 export interface Artifacts {
   model: boolean;
   code: boolean;
@@ -84,6 +98,7 @@ export interface Result {
   plan?: PlanInfo;
   ai?: AiInfo;
   review?: Review;
+  redteam?: RedTeam | null;
   artifacts?: Artifacts;
 }
 

@@ -1,0 +1,1137 @@
+{
+ "rows": [
+  {
+   "dataset": "diabetes",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 331,
+   "n_test": 111,
+   "note": "sklearn, 442 rows",
+   "methods": {
+    "ours": {
+     "score": 0.35796134599528495,
+     "seconds": 6.2,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.346294581382284,
+     "seconds": 10.0,
+     "model": "sgd"
+    },
+    "default_gbm": {
+     "score": 0.19274352427828034,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.00014359578276068596
+    }
+   }
+  },
+  {
+   "dataset": "diabetes",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 331,
+   "n_test": 111,
+   "note": "sklearn, 442 rows",
+   "methods": {
+    "ours": {
+     "score": 0.4418996503384809,
+     "seconds": 3.0,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.40635481066282253,
+     "seconds": 10.0,
+     "model": "sgd"
+    },
+    "default_gbm": {
+     "score": 0.32097011772421713,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.007035918242200845
+    }
+   }
+  },
+  {
+   "dataset": "diabetes",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 331,
+   "n_test": 111,
+   "note": "sklearn, 442 rows",
+   "methods": {
+    "ours": {
+     "score": 0.4488913238590555,
+     "seconds": 3.0,
+     "model": "Ridge regression (tuned)",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.3560164282775151,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.29370545600345666,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.0031994302993214596
+    }
+   }
+  },
+  {
+   "dataset": "car_details",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "used cars, many duplicate rows",
+   "methods": {
+    "ours": {
+     "score": 0.5120874463291,
+     "seconds": 15.6,
+     "model": "Ridge regression",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": -1.1554579734802246,
+     "seconds": 15.7,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.5486058834327721,
+     "seconds": 0.4
+    },
+    "baseline": {
+     "score": -0.0011503394018437252
+    }
+   }
+  },
+  {
+   "dataset": "car_details",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "used cars, many duplicate rows",
+   "methods": {
+    "ours": {
+     "score": 0.5541792698697214,
+     "seconds": 12.0,
+     "model": "Ridge regression",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.3205093741416931,
+     "seconds": 12.0,
+     "model": "xgb_limitdepth"
+    },
+    "default_gbm": {
+     "score": 0.5128040375319665,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": -0.0003373174610075136
+    }
+   }
+  },
+  {
+   "dataset": "car_details",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "used cars, many duplicate rows",
+   "methods": {
+    "ours": {
+     "score": 0.504100275099109,
+     "seconds": 7.8,
+     "model": "Ridge regression",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.515121863153716,
+     "seconds": 10.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.5814632169850612,
+     "seconds": 0.3
+    },
+    "baseline": {
+     "score": -0.00022168211987771969
+    }
+   }
+  },
+  {
+   "dataset": "mpg",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 298,
+   "n_test": 100,
+   "note": "fuel economy, has a free-text name column",
+   "methods": {
+    "ours": {
+     "score": 0.8204773508067951,
+     "seconds": 4.7,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.864375392233869,
+     "seconds": 10.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.8923301491762881,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.0009295459427598463
+    }
+   }
+  },
+  {
+   "dataset": "mpg",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 298,
+   "n_test": 100,
+   "note": "fuel economy, has a free-text name column",
+   "methods": {
+    "ours": {
+     "score": 0.8468247084482443,
+     "seconds": 9.9,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.8886488335490108,
+     "seconds": 10.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.8707266955011698,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.001541445779900119
+    }
+   }
+  },
+  {
+   "dataset": "mpg",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 298,
+   "n_test": 100,
+   "note": "fuel economy, has a free-text name column",
+   "methods": {
+    "ours": {
+     "score": 0.8663769744312224,
+     "seconds": 10.6,
+     "model": "Gradient boosting",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.8609583359741548,
+     "seconds": 10.6,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.8663769744312224,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": -0.02056345232469181
+    }
+   }
+  },
+  {
+   "dataset": "tips",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 182,
+   "n_test": 61,
+   "note": "restaurant tips, 244 rows",
+   "methods": {
+    "ours": {
+     "score": 0.33618408659165067,
+     "seconds": 4.6,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "fail"
+    },
+    "flaml": {
+     "score": 0.3279416813371725,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.16658492314621742,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -0.00647852390057424
+    }
+   }
+  },
+  {
+   "dataset": "tips",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 182,
+   "n_test": 61,
+   "note": "restaurant tips, 244 rows",
+   "methods": {
+    "ours": {
+     "score": 0.3825049943616421,
+     "seconds": 3.2,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.5140488759306681,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.44163857655563266,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -0.0033060183120092734
+    }
+   }
+  },
+  {
+   "dataset": "tips",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 182,
+   "n_test": 61,
+   "note": "restaurant tips, 244 rows",
+   "methods": {
+    "ours": {
+     "score": 0.4804984197166604,
+     "seconds": 3.5,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.5559229901408806,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.48236208677298775,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -2.2681673738533803e-05
+    }
+   }
+  },
+  {
+   "dataset": "diamonds",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "sampled to the row cap",
+   "methods": {
+    "ours": {
+     "score": 0.9665829080411861,
+     "seconds": 18.1,
+     "model": "Gradient boosting (tuned)",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9724552035331726,
+     "seconds": 18.3,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.9623063559794129,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": -0.007343913036528704
+    }
+   }
+  },
+  {
+   "dataset": "diamonds",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "sampled to the row cap",
+   "methods": {
+    "ours": {
+     "score": 0.9650439466815107,
+     "seconds": 10.4,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "fail"
+    },
+    "flaml": {
+     "score": 0.9735893607139587,
+     "seconds": 10.5,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.9625715458349385,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": -0.00044543966197885254
+    }
+   }
+  },
+  {
+   "dataset": "diamonds",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "sampled to the row cap",
+   "methods": {
+    "ours": {
+     "score": 0.9622233694100304,
+     "seconds": 10.1,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "fail"
+    },
+    "flaml": {
+     "score": 0.9633753547249801,
+     "seconds": 10.2,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.9617956635436335,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": -3.922099316211458e-06
+    }
+   }
+  },
+  {
+   "dataset": "healthexp",
+   "task": "regression",
+   "seed": 0,
+   "n_train": 205,
+   "n_test": 69,
+   "note": "health spending by country",
+   "methods": {
+    "ours": {
+     "score": 0.9849164253725364,
+     "seconds": 2.3,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "fail"
+    },
+    "flaml": {
+     "score": 0.9925555327489227,
+     "seconds": 10.0,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.9867626559029308,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -0.0003755880073557094
+    }
+   }
+  },
+  {
+   "dataset": "healthexp",
+   "task": "regression",
+   "seed": 1,
+   "n_train": 205,
+   "n_test": 69,
+   "note": "health spending by country",
+   "methods": {
+    "ours": {
+     "score": 0.9763500630601678,
+     "seconds": 2.2,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.9835304315137848,
+     "seconds": 10.0,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.9665385398557444,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -0.00022729618095640447
+    }
+   }
+  },
+  {
+   "dataset": "healthexp",
+   "task": "regression",
+   "seed": 2,
+   "n_train": 205,
+   "n_test": 69,
+   "note": "health spending by country",
+   "methods": {
+    "ours": {
+     "score": 0.9804292723880981,
+     "seconds": 2.0,
+     "model": "Ridge regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.9871531686287455,
+     "seconds": 10.0,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.9802213046448888,
+     "seconds": 0.0
+    },
+    "baseline": {
+     "score": -9.977636739044726e-08
+    }
+   }
+  },
+  {
+   "dataset": "breast_cancer",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 426,
+   "n_test": 143,
+   "note": "sklearn, 30 numeric features",
+   "methods": {
+    "ours": {
+     "score": 0.9550314465408805,
+     "accuracy": 0.958041958041958,
+     "seconds": 4.4,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9477366470004699,
+     "accuracy": 0.951048951048951,
+     "seconds": 10.1,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.9322809786898185,
+     "accuracy": 0.9370629370629371,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": 0.38626609442060084,
+     "accuracy": 0.6293706293706294
+    }
+   }
+  },
+  {
+   "dataset": "breast_cancer",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 426,
+   "n_test": 143,
+   "note": "sklearn, 30 numeric features",
+   "methods": {
+    "ours": {
+     "score": 0.9623783214943435,
+     "accuracy": 0.965034965034965,
+     "seconds": 4.7,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9328042604291755,
+     "accuracy": 0.9370629370629371,
+     "seconds": 10.1,
+     "model": "rf"
+    },
+    "default_gbm": {
+     "score": 0.9546703296703296,
+     "accuracy": 0.958041958041958,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.38626609442060084,
+     "accuracy": 0.6293706293706294
+    }
+   }
+  },
+  {
+   "dataset": "breast_cancer",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 426,
+   "n_test": 143,
+   "note": "sklearn, 30 numeric features",
+   "methods": {
+    "ours": {
+     "score": 0.9697802197802198,
+     "accuracy": 0.972027972027972,
+     "seconds": 4.1,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9620669531540135,
+     "accuracy": 0.965034965034965,
+     "seconds": 10.0,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.9468937344156189,
+     "accuracy": 0.951048951048951,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.38626609442060084,
+     "accuracy": 0.6293706293706294
+    }
+   }
+  },
+  {
+   "dataset": "wine",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 133,
+   "n_test": 45,
+   "note": "sklearn, 178 rows, 3 classes",
+   "methods": {
+    "ours": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 11.0,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9794967381174278,
+     "accuracy": 0.9777777777777777,
+     "seconds": 11.0,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.19047619047619047,
+     "accuracy": 0.4
+    }
+   }
+  },
+  {
+   "dataset": "wine",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 133,
+   "n_test": 45,
+   "note": "sklearn, 178 rows, 3 classes",
+   "methods": {
+    "ours": {
+     "score": 0.9771428571428572,
+     "accuracy": 0.9777777777777777,
+     "seconds": 2.7,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.19047619047619047,
+     "accuracy": 0.4
+    }
+   }
+  },
+  {
+   "dataset": "wine",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 133,
+   "n_test": 45,
+   "note": "sklearn, 178 rows, 3 classes",
+   "methods": {
+    "ours": {
+     "score": 0.9771428571428572,
+     "accuracy": 0.9777777777777777,
+     "seconds": 5.6,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 10.0,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.19047619047619047,
+     "accuracy": 0.4
+    }
+   }
+  },
+  {
+   "dataset": "digits",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 1347,
+   "n_test": 450,
+   "note": "sklearn, 64 pixels, 10 classes",
+   "methods": {
+    "ours": {
+     "score": 0.9691063378506513,
+     "accuracy": 0.9688888888888889,
+     "seconds": 32.0,
+     "model": "Logistic regression",
+     "review": "pass",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9754082916928958,
+     "accuracy": 0.9755555555555555,
+     "seconds": 33.2,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.9732501778010387,
+     "accuracy": 0.9733333333333334,
+     "seconds": 2.0
+    },
+    "baseline": {
+     "score": 0.018548387096774192,
+     "accuracy": 0.10222222222222223
+    }
+   }
+  },
+  {
+   "dataset": "digits",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 1347,
+   "n_test": 450,
+   "note": "sklearn, 64 pixels, 10 classes",
+   "methods": {
+    "ours": {
+     "score": 0.9686353166718185,
+     "accuracy": 0.9688888888888889,
+     "seconds": 29.1,
+     "model": "Logistic regression",
+     "review": "pass",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.962259325553446,
+     "accuracy": 0.9622222222222222,
+     "seconds": 29.3,
+     "model": "rf"
+    },
+    "default_gbm": {
+     "score": 0.9688461350868106,
+     "accuracy": 0.9688888888888889,
+     "seconds": 1.6
+    },
+    "baseline": {
+     "score": 0.018548387096774192,
+     "accuracy": 0.10222222222222223
+    }
+   }
+  },
+  {
+   "dataset": "digits",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 1347,
+   "n_test": 450,
+   "note": "sklearn, 64 pixels, 10 classes",
+   "methods": {
+    "ours": {
+     "score": 0.9490073624782613,
+     "accuracy": 0.9488888888888889,
+     "seconds": 14.7,
+     "model": "Logistic regression",
+     "review": "pass",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.9751628188293825,
+     "accuracy": 0.9755555555555555,
+     "seconds": 15.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.9708425474545009,
+     "accuracy": 0.9711111111111111,
+     "seconds": 2.4
+    },
+    "baseline": {
+     "score": 0.018548387096774192,
+     "accuracy": 0.10222222222222223
+    }
+   }
+  },
+  {
+   "dataset": "titanic",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 588,
+   "n_test": 196,
+   "note": "'alive' dropped: it repeats the target",
+   "methods": {
+    "ours": {
+     "score": 0.8415948275862069,
+     "accuracy": 0.8469387755102041,
+     "seconds": 5.6,
+     "model": "Logistic regression",
+     "review": "pass",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.833035640680388,
+     "accuracy": 0.8418367346938775,
+     "seconds": 10.0,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.8477241674926996,
+     "accuracy": 0.8520408163265306,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.36977491961414793,
+     "accuracy": 0.5867346938775511
+    }
+   }
+  },
+  {
+   "dataset": "titanic",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 588,
+   "n_test": 196,
+   "note": "'alive' dropped: it repeats the target",
+   "methods": {
+    "ours": {
+     "score": 0.7407617350932598,
+     "accuracy": 0.75,
+     "seconds": 6.9,
+     "model": "Gradient boosting",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.739693725437051,
+     "accuracy": 0.75,
+     "seconds": 10.1,
+     "model": "xgboost"
+    },
+    "default_gbm": {
+     "score": 0.7407617350932598,
+     "accuracy": 0.75,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": 0.36977491961414793,
+     "accuracy": 0.5867346938775511
+    }
+   }
+  },
+  {
+   "dataset": "titanic",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 588,
+   "n_test": 196,
+   "note": "'alive' dropped: it repeats the target",
+   "methods": {
+    "ours": {
+     "score": 0.8415948275862069,
+     "accuracy": 0.8469387755102041,
+     "seconds": 5.1,
+     "model": "Logistic regression",
+     "review": "pass",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 0.7967914438502675,
+     "accuracy": 0.8061224489795918,
+     "seconds": 10.1,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.777345017851347,
+     "accuracy": 0.7857142857142857,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.36977491961414793,
+     "accuracy": 0.5867346938775511
+    }
+   }
+  },
+  {
+   "dataset": "penguins",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 258,
+   "n_test": 86,
+   "note": "3 species, has missing values",
+   "methods": {
+    "ours": {
+     "score": 0.9902065147966788,
+     "accuracy": 0.9883720930232558,
+     "seconds": 3.6,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.9902065147966788,
+     "accuracy": 0.9883720930232558,
+     "seconds": 10.0,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.9758875004776645,
+     "accuracy": 0.9767441860465116,
+     "seconds": 0.1
+    },
+    "baseline": {
+     "score": 0.20430107526881722,
+     "accuracy": 0.4418604651162791
+    }
+   }
+  },
+  {
+   "dataset": "penguins",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 258,
+   "n_test": 86,
+   "note": "3 species, has missing values",
+   "methods": {
+    "ours": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 3.4,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.9626836672738311,
+     "accuracy": 0.9651162790697675,
+     "seconds": 10.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.9761761761761761,
+     "accuracy": 0.9767441860465116,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": 0.20430107526881722,
+     "accuracy": 0.4418604651162791
+    }
+   }
+  },
+  {
+   "dataset": "penguins",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 258,
+   "n_test": 86,
+   "note": "3 species, has missing values",
+   "methods": {
+    "ours": {
+     "score": 0.9860317460317459,
+     "accuracy": 0.9883720930232558,
+     "seconds": 3.6,
+     "model": "Logistic regression",
+     "review": "caution",
+     "redteam": "pass"
+    },
+    "flaml": {
+     "score": 1.0,
+     "accuracy": 1.0,
+     "seconds": 10.1,
+     "model": "extra_tree"
+    },
+    "default_gbm": {
+     "score": 0.9724724724724725,
+     "accuracy": 0.9767441860465116,
+     "seconds": 0.2
+    },
+    "baseline": {
+     "score": 0.20430107526881722,
+     "accuracy": 0.4418604651162791
+    }
+   }
+  },
+  {
+   "dataset": "taxis",
+   "task": "classification",
+   "seed": 0,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "'tip' and 'total' dropped (cash tips are not recorded); raw timestamps dropped",
+   "methods": {
+    "ours": {
+     "score": 0.5193074782505226,
+     "accuracy": 0.684,
+     "seconds": 14.9,
+     "model": "Gradient boosting",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.5436463401112557,
+     "accuracy": 0.7,
+     "seconds": 15.0,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.5193074782505226,
+     "accuracy": 0.684,
+     "seconds": 0.4
+    },
+    "baseline": {
+     "score": 0.4217424826522745,
+     "accuracy": 0.7293333333333333
+    }
+   }
+  },
+  {
+   "dataset": "taxis",
+   "task": "classification",
+   "seed": 1,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "'tip' and 'total' dropped (cash tips are not recorded); raw timestamps dropped",
+   "methods": {
+    "ours": {
+     "score": 0.5471351646442839,
+     "accuracy": 0.708,
+     "seconds": 15.8,
+     "model": "Gradient boosting",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.5345433255269321,
+     "accuracy": 0.7173333333333334,
+     "seconds": 15.9,
+     "model": "lgbm"
+    },
+    "default_gbm": {
+     "score": 0.5471351646442839,
+     "accuracy": 0.708,
+     "seconds": 0.3
+    },
+    "baseline": {
+     "score": 0.4217424826522745,
+     "accuracy": 0.7293333333333333
+    }
+   }
+  },
+  {
+   "dataset": "taxis",
+   "task": "classification",
+   "seed": 2,
+   "n_train": 2250,
+   "n_test": 750,
+   "note": "'tip' and 'total' dropped (cash tips are not recorded); raw timestamps dropped",
+   "methods": {
+    "ours": {
+     "score": 0.5516569200779727,
+     "accuracy": 0.724,
+     "seconds": 15.8,
+     "model": "Gradient boosting",
+     "review": "pass",
+     "redteam": "caution"
+    },
+    "flaml": {
+     "score": 0.5618785941366586,
+     "accuracy": 0.7346666666666667,
+     "seconds": 16.0,
+     "model": "rf"
+    },
+    "default_gbm": {
+     "score": 0.5516569200779727,
+     "accuracy": 0.724,
+     "seconds": 0.4
+    },
+    "baseline": {
+     "score": 0.4217424826522745,
+     "accuracy": 0.7293333333333333
+    }
+   }
+  }
+ ],
+ "leak_demo": {
+  "score": 1.0,
+  "accuracy": 1.0,
+  "seconds": 3.5,
+  "model": "Logistic regression",
+  "review": "fail",
+  "redteam": "caution",
+  "findings": [
+   "'alive' alone predicts the target",
+   "The score is unusually high"
+  ]
+ },
+ "config": {
+  "seeds": 3,
+  "tuning_budget": 8.0,
+  "max_rows": 3000
+ }
+}
