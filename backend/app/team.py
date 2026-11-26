@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -36,6 +37,11 @@ class PlanOut(BaseModel):
     target_transform: Literal["none", "log"] = Field(description="Use 'log' only for a positive, right-skewed numeric target")
     drop_columns: list[DropColumn] = Field(default_factory=list, description="Extra feature columns to drop, with a reason")
     rationale: str = Field(description="Two sentences explaining the plan in plain language")
+
+
+class WhatIfPlanOut(BaseModel):
+    drop_columns: list[str] = Field(min_length=1, max_length=5, description="Feature columns to exclude")
+    rationale: str = Field(description="Briefly explain the requested feature change")
 
 
 # ---------- helpers ----------
@@ -72,6 +78,59 @@ def validate_plan(raw: PlanOut, df: pd.DataFrame, target: str, task: str) -> dic
     return {"models": models, "target_transform": transform, "drop_columns": drops, "rationale": raw.rationale[:500], "source": "ai"}
 
 
+def make_what_if_plan(
+    profile: dict,
+    target: str,
+    question: str,
+    original_plan: dict,
+    excluded_columns: list[str] | None = None,
+) -> dict:
+    excluded = {name.casefold() for name in (excluded_columns or [])}
+    columns = [c["name"] for c in profile["columns"] if c["name"] != target and c["name"].casefold() not in excluded]
+    allowed = {name.casefold(): name for name in columns}
+    llm = llm_mod.get_llm()
+    try:
+        raw = llm.structured(
+            "What-if planner",
+            "Translate the user's what-if request into feature columns to remove. Only remove columns explicitly named "
+            "by the user, never the target. Select from the supplied allowed column names, return between one and five "
+            "columns, and do not propose any other transformation.",
+            json.dumps({"question": question, "target": target, "allowed_columns": columns}),
+            WhatIfPlanOut,
+        )
+        requested = raw.drop_columns
+        rationale = raw.rationale[:500]
+    except Exception as exc:
+        match = re.search(r"\b(?:drop|remove|exclude|without)\s+(?:the\s+)?(.+?)\s*$", question.strip(), re.IGNORECASE)
+        candidate = match.group(1).strip(" \t\r\n\"'`.,!?") if match else ""
+        candidate = re.sub(r"\s+column$", "", candidate, flags=re.IGNORECASE).strip()
+        selected = allowed.get(candidate.casefold())
+        if selected is None:
+            raise ValueError(
+                "With AI unavailable, ask a direct question such as 'What if I drop the city column?' using an exact feature name."
+            ) from exc
+        requested = [selected]
+        rationale = f"Remove {selected} and compare the retrained models with the original experiment."
+
+    selected_columns: list[str] = []
+    for column in requested:
+        selected = allowed.get(column.casefold())
+        if selected is None:
+            raise ValueError(f"The what-if plan named an unavailable feature column: '{column}'.")
+        if selected not in selected_columns:
+            selected_columns.append(selected)
+    if not selected_columns:
+        raise ValueError("The what-if request must identify at least one feature column to remove.")
+
+    plan = dict(original_plan)
+    drops = list(plan.get("drop_columns", []))
+    for column in selected_columns:
+        if not any(item["column"] == column for item in drops):
+            drops.append({"column": column, "reason": f"What-if scenario: {rationale}"})
+    plan.update(drop_columns=drops, rationale=rationale, source="what-if")
+    return plan
+
+
 def _reason(exc: Exception) -> str:
     return str(exc) if isinstance(exc, LLMUnavailable) else f"Unexpected error ({exc.__class__.__name__})"
 
@@ -86,6 +145,9 @@ def run_team(
     progress: Progress,
     artifact_dir: Path | None = None,
     tune_budget: float | None = None,
+    plan_override: dict | None = None,
+    profile_override: dict | None = None,
+    what_if_context: dict | None = None,
 ) -> dict:
     llm = llm_mod.get_llm()
     if tune_budget is None:
@@ -95,51 +157,67 @@ def run_team(
         emit({"id": id_, "agent": agent, "title": title, "status": status, "detail": detail})
 
     # 1. Profiler
-    step("profiler", "Profiler", "Reading the dataset", "running")
-    profile = profile_dataframe(df)
-    facts = {
-        "rows": profile["rows"],
-        "columns": [
-            {k: c[k] for k in ("name", "kind", "missing_pct", "unique", "looks_like_id")} for c in profile["columns"][:60]
-        ],
-        "duplicates": profile["duplicates"],
-        "target": target,
-        "task": task,
-        "target_stats": target_stats(df[target], task),
-    }
-    basic = f"{profile['rows']:,} rows and {profile['columns_count']} columns. Predicting '{target}' ({task})."
-    try:
-        summary = llm.text(
-            "Profiler",
-            "You are a careful data profiler. In 2 or 3 plain sentences describe this dataset and its biggest risks "
-            "for modelling. Use only the facts given. No markdown, no lists.",
-            json.dumps(facts),
-        )
-        step("profiler", "Profiler", "Dataset reviewed", "done", summary)
-    except Exception as exc:
-        step("profiler", "Profiler", "Dataset reviewed", "skipped", f"{basic} (AI summary skipped: {_reason(exc)})")
+    if profile_override is None:
+        step("profiler", "Profiler", "Reading the dataset", "running")
+        profile = profile_dataframe(df)
+    else:
+        profile = profile_override
+    facts = {}
+    basic = ""
+    if profile_override is None or plan_override is None:
+        facts = {
+            "rows": profile["rows"],
+            "columns": [
+                {k: c[k] for k in ("name", "kind", "missing_pct", "unique", "looks_like_id")}
+                for c in profile["columns"][:60]
+            ],
+            "duplicates": profile["duplicates"],
+            "target": target,
+            "task": task,
+            "target_stats": target_stats(df[target], task),
+        }
+        basic = f"{profile['rows']:,} rows and {profile['columns_count']} columns. Predicting '{target}' ({task})."
+    if profile_override is not None:
+        step("profiler", "Profiler", "Original profile reused", "skipped", "The uploaded dataset and profile are unchanged.")
+    else:
+        try:
+            summary = llm.text(
+                "Profiler",
+                "You are a careful data profiler. In 2 or 3 plain sentences describe this dataset and its biggest risks "
+                "for modelling. Use only the facts given. No markdown, no lists.",
+                json.dumps(facts),
+            )
+            step("profiler", "Profiler", "Dataset reviewed", "done", summary)
+        except Exception as exc:
+            step("profiler", "Profiler", "Dataset reviewed", "skipped", f"{basic} (AI summary skipped: {_reason(exc)})")
 
     # 2. Planner
     step("planner", "Planner", "Planning the experiment", "running")
-    plan = default_plan(df, target, task)
-    try:
-        raw = llm.structured(
-            "Planner",
-            "You plan a tabular machine learning experiment. Choose which models to try and whether to log-transform "
-            "the target. Only drop a feature column if it is clearly an identifier, a duplicate of the target or a "
-            "leak of the answer. Never drop the target. Keep the rationale to two plain sentences.",
-            json.dumps({**facts, "allowed_models": list(MODEL_KEYS)}),
-            PlanOut,
-        )
-        plan = validate_plan(raw, df, target, task)
-        step("planner", "Planner", "Plan ready", "done", plan["rationale"])
-    except Exception as exc:
-        step("planner", "Planner", "Plan ready", "skipped", f"{plan['rationale']} (AI planning skipped: {_reason(exc)})")
+    if plan_override is not None:
+        plan = dict(plan_override)
+        step("planner", "Planner", "What-if plan ready", "done", plan["rationale"])
+    else:
+        plan = default_plan(df, target, task)
+        try:
+            raw = llm.structured(
+                "Planner",
+                "You plan a tabular machine learning experiment. Choose which models to try and whether to log-transform "
+                "the target. Only drop a feature column if it is clearly an identifier, a duplicate of the target or a "
+                "leak of the answer. Never drop the target. Keep the rationale to two plain sentences.",
+                json.dumps({**facts, "allowed_models": list(MODEL_KEYS)}),
+                PlanOut,
+            )
+            plan = validate_plan(raw, df, target, task)
+            step("planner", "Planner", "Plan ready", "done", plan["rationale"])
+        except Exception as exc:
+            step("planner", "Planner", "Plan ready", "skipped", f"{plan['rationale']} (AI planning skipped: {_reason(exc)})")
 
     # 3 and 4. Cleaner and Modeler run inside run_experiment and report through emit
     result = run_experiment(df, target, task, progress, plan=plan, emit=emit, tune_budget=tune_budget, artifact_dir=artifact_dir)
     result["plan"] = plan
     result["ai"] = llm.info()
+    if what_if_context:
+        result["what_if"] = what_if_context
 
     # 5. Advisor
     step("advisor", "Advisor", "Explaining the result", "running")

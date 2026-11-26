@@ -49,7 +49,7 @@ export interface PlanInfo {
   models: string[];
   target_transform: "none" | "log";
   rationale: string;
-  source: "ai" | "default";
+  source: "ai" | "default" | "what-if";
 }
 
 export interface Finding {
@@ -100,6 +100,13 @@ export interface Result {
   review?: Review;
   redteam?: RedTeam | null;
   artifacts?: Artifacts;
+  what_if?: {
+    question: string;
+    parent_run_id: string;
+    baseline_metric: string;
+    baseline_model: string | null;
+    baseline_cv_mean: number | null;
+  };
 }
 
 export interface Run {
@@ -112,6 +119,8 @@ export interface Run {
   result: Result | null;
   error: string | null;
   steps: Step[];
+  parent_run_id?: string | null;
+  scenario?: string | null;
 }
 
 export interface User {

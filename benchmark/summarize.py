@@ -42,7 +42,7 @@ def write_markdown(state: dict, path) -> None:
         best_gaps.append(max(ms.values()) - ms["ours"])
     lines += ["", "## Summary", ""]
     if gaps:
-        lines.append(f"- Against FLAML on dataset averages (ties are differences under {TIE}): **{wins} wins, {ties} ties, {losses} losses**. Median difference {np.median(gaps):+.3f} (average {np.mean(gaps):+.3f}, pulled up by any run where FLAML failed, see below). In short: roughly on par, slightly behind on most datasets.")
+        lines.append(f"- Against FLAML on dataset averages (ties are differences under {TIE}): **{wins} wins, {ties} ties, {losses} losses**. Median difference {np.median(gaps):+.3f} (average {np.mean(gaps):+.3f}, pulled up by any run where FLAML failed, see below).")
     gbm = [float(np.mean(table[k]["ours"])) - float(np.mean(table[k]["default_gbm"])) for k in names if "default_gbm" in table[k]]
     if gbm:
         lines.append(f"- Against a default gradient boosting model, which needs no tuning and is steady from run to run: **{sum(d > TIE for d in gbm)} wins, {sum(abs(d) <= TIE for d in gbm)} ties, {sum(d < -TIE for d in gbm)} losses**. Average difference: {np.mean(gbm):+.3f}.")
@@ -52,7 +52,7 @@ def write_markdown(state: dict, path) -> None:
         lines.append(f"- FLAML scored below the do-nothing baseline on {len(erratic)} of {n_flaml} runs. It is limited by the time budget, so one unlucky search can fail badly. That flatters our numbers, and the default gradient boosting column is the steadier reference.")
     lines.append(f"- Our score was within 0.02 of the best method on {sum(g <= 0.02 for g in best_gaps)} of {len(best_gaps)} datasets.")
     ours_rows = [r["methods"]["ours"] for r in rows]
-    lines.append(f"- Median time: ours {np.median([o['seconds'] for o in ours_rows]):.0f}s per dataset. FLAML was given the same wall-clock time (10 to 60s).")
+    lines.append(f"- Median time: ours {np.median([o['seconds'] for o in ours_rows]):.0f}s per run. FLAML was given the same wall-clock time (10 to 60s).")
     picks = Counter(o["model"] for o in ours_rows)
     lines.append("- Models our system recommended: " + ", ".join(f"{m} ({n})" for m, n in picks.most_common()) + ".")
     reviews = Counter(o["review"] for o in ours_rows)

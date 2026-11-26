@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Iterator
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, create_engine, update
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text, create_engine, inspect, text, update
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
@@ -23,6 +23,16 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("true"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -30,6 +40,7 @@ class Run(Base):
     __tablename__ = "runs"
     id: Mapped[str] = mapped_column(String(12), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    parent_run_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
     filename: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="profiled")
     progress: Mapped[float] = mapped_column(Float, default=0.0)
@@ -40,6 +51,7 @@ class Run(Base):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     steps: Mapped[str] = mapped_column(Text, default="[]")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scenario: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -67,6 +79,15 @@ def configure(url: str) -> None:
     _engine = create_engine(url, connect_args=args, pool_pre_ping=True)
     _Session = sessionmaker(_engine, expire_on_commit=False)
     Base.metadata.create_all(_engine)
+    with _engine.begin() as connection:
+        user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
+        if "email_verified" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT TRUE"))
+        run_columns = {column["name"] for column in inspect(connection).get_columns("runs")}
+        if "parent_run_id" not in run_columns:
+            connection.execute(text("ALTER TABLE runs ADD COLUMN parent_run_id VARCHAR(12)"))
+        if "scenario" not in run_columns:
+            connection.execute(text("ALTER TABLE runs ADD COLUMN scenario TEXT"))
 
 
 def is_configured() -> bool:
@@ -100,6 +121,8 @@ def run_to_dict(run: Run) -> dict:
         "result": json.loads(run.result) if run.result else None,
         "steps": json.loads(run.steps or "[]"),
         "error": run.error,
+        "parent_run_id": run.parent_run_id,
+        "scenario": run.scenario,
         "created_at": run.created_at.isoformat(),
     }
 

@@ -5,6 +5,7 @@ pandas>=2.2
 numpy>=1.26
 scikit-learn>=1.5
 agno>=2.2
+boto3>=1.35
 python-dotenv>=1.0
 sqlalchemy>=2.0
 pyjwt>=2.8

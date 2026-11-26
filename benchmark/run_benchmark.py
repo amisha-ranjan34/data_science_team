@@ -2,7 +2,7 @@
 
 Run from the repository root:
     pip install -r benchmark/requirements.txt
-    python benchmark/run_benchmark.py --seeds 3 --budget 15
+    python benchmark/run_benchmark.py --seeds 5 --budget 8 --max-rows 3000
 
 Protocol (identical for every method):
   * each dataset is de-duplicated, then split 75/25 with a fixed seed; every method sees only the 75% to learn from
@@ -21,6 +21,8 @@ import time
 import urllib.request
 import warnings
 from pathlib import Path
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "2")
 
 import joblib
 import numpy as np
@@ -90,6 +92,10 @@ DATASETS = [
     ("titanic", "classification", "survived", lambda: csv(SEABORN.format("titanic"), "titanic"), ["alive"], "'alive' dropped: it repeats the target"),
     ("penguins", "classification", "species", lambda: csv(SEABORN.format("penguins"), "penguins"), [], "3 species, has missing values"),
     ("taxis", "classification", "payment", lambda: csv(SEABORN.format("taxis"), "taxis"), ["tip", "total", "pickup", "dropoff"], "'tip' and 'total' dropped (cash tips are not recorded); raw timestamps dropped"),
+    ("car_crashes", "regression", "total", lambda: csv(SEABORN.format("car_crashes"), "car_crashes"), [], "state road-safety observations"),
+    ("iris", "classification", "species", lambda: csv(SEABORN.format("iris"), "iris"), [], "classic 3-species classification dataset"),
+    ("geyser", "regression", "waiting", lambda: csv(SEABORN.format("geyser"), "geyser"), [], "Old Faithful eruption and waiting times"),
+    ("exercise", "regression", "pulse", lambda: csv(SEABORN.format("exercise"), "exercise"), ["id", "Unnamed: 0"], "repeated measurements; row index and subject IDs excluded"),
 ]
 
 
@@ -132,10 +138,15 @@ def run_flaml(train, test, target, task, budget):
         from flaml import AutoML
     except Exception as exc:  # not installed or blocked by the machine
         return {"skipped": f"FLAML unavailable ({exc.__class__.__name__})"}
+    x_train = train.drop(columns=[target]).copy()
+    x_test = test.drop(columns=[target]).copy()
+    safe_names = [f"feature_{index}" for index in range(len(x_train.columns))]
+    x_train.columns = safe_names
+    x_test.columns = safe_names
     t0 = time.perf_counter()
     automl = AutoML()
     automl.fit(
-        X_train=train.drop(columns=[target]),
+        X_train=x_train,
         y_train=train[target],
         task=task,
         metric="r2" if task == "regression" else "macro_f1",
@@ -143,7 +154,7 @@ def run_flaml(train, test, target, task, budget):
         seed=0,
         verbose=0,
     )
-    pred = automl.predict(test.drop(columns=[target]))
+    pred = automl.predict(x_test)
     out = score(task, test[target], pred)
     out.update(seconds=round(time.perf_counter() - t0, 1), model=str(automl.best_estimator))
     return out
@@ -183,9 +194,9 @@ def leak_demo(max_rows: int) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seeds", type=int, default=3)
-    ap.add_argument("--budget", type=float, default=15, help="tuning budget (seconds) for our system")
-    ap.add_argument("--max-rows", type=int, default=5000)
+    ap.add_argument("--seeds", type=int, default=5)
+    ap.add_argument("--budget", type=float, default=8, help="tuning budget (seconds) for our system")
+    ap.add_argument("--max-rows", type=int, default=3000)
     ap.add_argument("--only", default="", help="comma-separated dataset names")
     ap.add_argument("--out", default=str(ROOT / "results.json"))
     args = ap.parse_args()

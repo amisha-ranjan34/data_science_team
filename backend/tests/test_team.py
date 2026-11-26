@@ -5,7 +5,7 @@ from sklearn.datasets import make_regression
 
 from app import llm as llm_mod
 from app.llm import LLM, LLMUnavailable, explain_error
-from app.team import DropColumn, PlanOut, default_plan, run_team, validate_plan
+from app.team import DropColumn, PlanOut, WhatIfPlanOut, default_plan, make_what_if_plan, run_team, validate_plan
 
 
 def skewed_df(n=300):
@@ -62,6 +62,28 @@ def test_validate_plan_strips_unsafe_parts():
     assert plan["drop_columns"] == []
     df["price"] = df["price"] - 10  # now has negatives, so log must be refused
     assert validate_plan(raw, df, "price", "regression")["target_transform"] == "none"
+
+
+def test_what_if_plan_validates_ai_columns_and_preserves_original_plan(monkeypatch):
+    profile = {"columns": [{"name": "price"}, {"name": "city"}, {"name": "id"}]}
+
+    class WhatIfStub(OfflineLLM):
+        def structured(self, *args, **kwargs):
+            return WhatIfPlanOut(drop_columns=["CITY"], rationale="Compare without city.")
+
+    monkeypatch.setattr(llm_mod, "_llm", WhatIfStub())
+    base = {"models": ["linear"], "target_transform": "none", "drop_columns": [], "rationale": "Original", "source": "ai"}
+    plan = make_what_if_plan(profile, "price", "What if city was removed?", base)
+    assert plan["models"] == ["linear"] and plan["source"] == "what-if"
+    assert plan["drop_columns"] == [{"column": "city", "reason": "What-if scenario: Compare without city."}]
+
+    class UnsafeWhatIfStub(OfflineLLM):
+        def structured(self, *args, **kwargs):
+            return WhatIfPlanOut(drop_columns=["price"], rationale="Drop the target.")
+
+    monkeypatch.setattr(llm_mod, "_llm", UnsafeWhatIfStub())
+    with pytest.raises(ValueError, match="unavailable feature"):
+        make_what_if_plan(profile, "price", "What if the target is removed?", base)
 
 
 def test_team_runs_offline_with_fallbacks(monkeypatch):

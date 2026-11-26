@@ -18,27 +18,27 @@ export default function ConfigPanel({ run, busy, onTrain, onReset, ai }: Props) 
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+      <section className="section-rule pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold">{run.filename}</h2>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-base text-text-2">
               {profile.rows.toLocaleString()} rows, {profile.columns_count} columns, {profile.duplicates} duplicate rows
             </p>
           </div>
-          <button onClick={onReset} className="text-sm font-semibold text-accent hover:underline">
+          <button onClick={onReset} className="text-[13px] font-semibold text-volt hover:underline">
             Upload a different file
           </button>
         </div>
 
         {profile.warnings.length > 0 && (
-          <ul className="mt-4 space-y-1.5 rounded-lg bg-[#FFF6E5] p-3 text-sm text-warn">
+          <ul className="mt-4 rounded-lg border border-bad/50 bg-bad/10 p-3 text-base text-text">
             {profile.warnings.map((w) => <li key={w}>{w}</li>)}
           </ul>
         )}
       </section>
 
-      <section className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+      <section className="section-rule pt-5">
         <h2 className="text-lg font-bold">What should the models predict?</h2>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           <label className="block text-sm font-semibold">
@@ -46,22 +46,22 @@ export default function ConfigPanel({ run, busy, onTrain, onReset, ai }: Props) 
             <select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-base font-normal text-ink"
+              className="mt-2 h-12 w-full rounded-lg border border-line-strong bg-bg px-3 text-base text-text"
             >
               {profile.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
-            {target === profile.suggested_target && <span className="mt-1.5 block text-xs font-normal text-muted">Suggested from the column names.</span>}
+            {target === profile.suggested_target && <span className="mt-1.5 block text-[12px] text-text-2">Suggested from the column names.</span>}
           </label>
           <fieldset>
             <legend className="text-sm font-semibold">Problem type</legend>
-            <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-line bg-paper p-1">
+            <div className="mt-2 grid grid-cols-2 border-b border-line">
               {(["regression", "classification"] as Task[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTask(t)}
                   aria-pressed={task === t}
-                  className={"rounded-md px-3 py-2 text-sm font-semibold capitalize transition-colors " + (task === t ? "bg-accent text-white" : "text-muted hover:text-ink")}
+                  className={"pb-3 text-sm capitalize " + (task === t ? "border-b border-accent text-ink" : "text-muted hover:text-ink")}
                 >
                   {t}
                 </button>
@@ -81,7 +81,7 @@ export default function ConfigPanel({ run, busy, onTrain, onReset, ai }: Props) 
           {showColumns ? "Hide columns" : "Show all columns"}
         </button>
         {showColumns && (
-          <div className="mt-3 overflow-x-auto rounded-lg border border-line">
+          <div className="mt-3 overflow-x-auto border-t border-line">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead className="bg-paper text-muted">
                 <tr>
@@ -119,7 +119,7 @@ export default function ConfigPanel({ run, busy, onTrain, onReset, ai }: Props) 
           <button
             onClick={() => onTrain(target, task)}
             disabled={busy}
-            className="w-full rounded-lg bg-accent px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-dark disabled:opacity-60 sm:w-auto"
+            className="ui-button ui-button-primary w-full disabled:opacity-60 sm:w-auto"
           >
             Train and compare models
           </button>

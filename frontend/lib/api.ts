@@ -1,14 +1,15 @@
 import type { AiInfo, Run, RunSummary, Task, User } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TOKEN_KEY = "adst_token";
 const FILE_NAMES = { model: "model.joblib", code: "train_model.py", report: "report.md" } as const;
 
 export class AuthError extends Error {}
 
-export const getToken = () => (typeof window === "undefined" ? null : window.localStorage.getItem(TOKEN_KEY));
-const setToken = (t: string) => window.localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => window.localStorage.removeItem(TOKEN_KEY);
+function csrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const cookie = document.cookie.split("; ").find((value) => value.startsWith("adst_csrf="));
+  return cookie ? decodeURIComponent(cookie.slice("adst_csrf=".length)) : null;
+}
 
 async function parse<T>(res: Response, authenticated = true): Promise<T> {
   if (!res.ok) {
@@ -27,10 +28,11 @@ async function parse<T>(res: Response, authenticated = true): Promise<T> {
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  const token = getToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const method = (init.method ?? "GET").toUpperCase();
+  const csrf = csrfToken();
+  if (csrf && !["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("X-CSRF-Token", csrf);
   try {
-    return await fetch(`${BASE}${path}`, { ...init, headers });
+    return await fetch(`${BASE}${path}`, { ...init, headers, credentials: "include" });
   } catch {
     throw new Error("Cannot reach the server. Check that the backend is running on " + BASE + ".");
   }
@@ -44,12 +46,26 @@ const json = (body: unknown): RequestInit => ({
 
 // ---- accounts
 async function authenticate(path: string, email: string, password: string): Promise<User> {
-  const data = await parse<{ token: string; user: User }>(await request(path, json({ email, password })), false);
-  setToken(data.token);
+  const data = await parse<{ user: User }>(await request(path, json({ email, password })), false);
   return data.user;
 }
 export const login = (email: string, password: string) => authenticate("/api/auth/login", email, password);
-export const register = (email: string, password: string) => authenticate("/api/auth/register", email, password);
+export interface VerificationResponse {
+  email: string;
+  message: string;
+  verification_token?: string;
+}
+export interface ResendVerificationResponse {
+  message: string;
+  verification_token?: string;
+}
+export const register = async (email: string, password: string) =>
+  parse<VerificationResponse>(await request("/api/auth/register", json({ email, password })), false);
+export const verifyEmail = async (token: string) =>
+  parse<{ user: User }>(await request("/api/auth/verify-email", json({ token })), false);
+export const resendVerification = async (email: string) =>
+  parse<ResendVerificationResponse>(await request("/api/auth/resend-verification", json({ email })), false);
+export const logout = async () => parse<void>(await request("/api/auth/logout", { method: "POST" }), false);
 export const getMe = async () => parse<User>(await request("/api/auth/me"));
 
 // ---- runs
@@ -61,12 +77,14 @@ export const uploadCsv = async (file: File): Promise<Run> => {
 export const startTraining = async (id: string, target: string, task: Task): Promise<void> => {
   await parse(await request(`/api/runs/${id}/train`, json({ target, task })));
 };
+export const startWhatIf = async (id: string, question: string) =>
+  parse<Run>(await request(`/api/runs/${id}/what-if`, json({ question })));
 export const getRun = async (id: string) => parse<Run>(await request(`/api/runs/${id}`));
 export const listRuns = async () => parse<RunSummary[]>(await request("/api/runs"));
 export const deleteRun = async (id: string) => parse<void>(await request(`/api/runs/${id}`, { method: "DELETE" }));
 export const getConfig = async (): Promise<{ ai: AiInfo }> => parse(await request("/api/config"));
 
-/** Downloads need the login token, so they go through fetch instead of a plain link. */
+/** Use fetch so the authenticated cookies are included with the download request. */
 export async function downloadFile(id: string, kind: keyof typeof FILE_NAMES): Promise<void> {
   const res = await request(`/api/runs/${id}/download/${kind}`);
   if (!res.ok) await parse(res);

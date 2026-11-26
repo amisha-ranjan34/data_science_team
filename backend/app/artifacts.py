@@ -106,6 +106,19 @@ def build_report(result: dict) -> str:
         lines += [f"**{rec['model']}**", "", rec.get("explanation") or rec["reason"], ""]
     else:
         lines += ["**No model is recommended.**", "", rec["reason"], ""]
+    what_if = result.get("what_if")
+    if what_if:
+        lines += [
+            "## What-if scenario",
+            "",
+            what_if["question"],
+            "",
+            f"Compared with run `{what_if['parent_run_id']}`: "
+            f"{what_if.get('baseline_model') or 'no recommended model'} at "
+            f"{what_if.get('baseline_cv_mean') if what_if.get('baseline_cv_mean') is not None else 'n/a'} "
+            f"({what_if['baseline_metric']}).",
+            "",
+        ]
     lines += [
         "## Data",
         "",

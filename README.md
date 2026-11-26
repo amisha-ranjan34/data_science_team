@@ -13,6 +13,7 @@ Upload a CSV. A team of agents profiles it, cleans it, trains and tunes several 
 - **Live progress.** The timeline streams over server-sent events, with polling as a fallback.
 - **Agents with a safety net.** LLM agents plan and explain, tested code does the ML, and every agent has a rule-based fallback, so a bad or missing AI answer never breaks a run.
 - **Take it with you.** Download the trained model, a reproducible `train_model.py` and a short report.
+- **What-if analysis.** Ask what changes when a feature column is removed; the original upload/profile and model plan are reused, while training and review run again for a comparable result.
 - **Real app basics.** Accounts, per-user run history, daily limits, health check, Docker and CI.
 
 ## Architecture
@@ -61,12 +62,12 @@ cp .env.local.example .env.local
 npm install
 npm run dev
 ```
-Open http://localhost:3000, create an account and upload a CSV. Without an AI key the app still works in rule-based mode.
+Open http://localhost:3000, create an account, verify the email and upload a CSV. Locally, if SMTP is not configured, the API returns a development-only verification code. Without an AI key the app still works in rule-based mode.
 
 ## Quick start (Docker)
 ```bash
 cp .env.example .env            # set SECRET_KEY (the file shows how to generate one)
-cp backend/.env.example backend/.env   # optional: add an AI key
+cp backend/.env.example backend/.env   # configure SMTP for production sign-up; AI keys and S3 storage are optional
 docker compose up --build
 ```
 Frontend on http://localhost:3000, API on http://localhost:8000. Data lives in the `backend-data` volume.
@@ -78,9 +79,15 @@ Frontend on http://localhost:3000, API on http://localhost:8000. Data lives in t
 | `ENV` | backend | `production` enforces the secret key |
 | `ALLOWED_ORIGINS` | backend | Comma-separated frontend URLs allowed by CORS |
 | `DATABASE_URL` | backend | SQLite by default. A Postgres URL also works (`pip install "psycopg[binary]"`) |
-| `DATA_DIR` | backend | Where uploads, models and the SQLite file are stored |
+| `DATA_DIR` | backend | Where uploads and the SQLite file are stored; local artifacts also use this directory |
 | `ALLOW_REGISTRATION` | backend | `false` closes sign-ups |
 | `MAX_RUNS_PER_DAY` | backend | Upload limit per user per day (default 30) |
+| `AUTH_COOKIE_SAMESITE` | backend | Session-cookie policy (`lax` locally; defaults to `none` in production for separate frontend/API hosts) |
+| `FRONTEND_URL` | backend | Frontend origin used to build verification links |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS` | backend | SMTP delivery for email verification; required to register users in production |
+| `VERIFY_TOKEN_HOURS` | backend | Verification-link lifetime (default 24 hours) |
+| `ARTIFACT_STORAGE` | backend | `local` (default) or `s3` for downloadable model/report files |
+| `ARTIFACT_BUCKET`, `AWS_REGION`, `S3_ENDPOINT_URL` | backend | S3 bucket and optional S3-compatible endpoint; credentials use the standard AWS SDK chain |
 | `GROQ_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | backend | One key switches the AI agents on. `LLM_MODEL` overrides the model |
 | `TUNING_BUDGET_SECONDS` | backend | `0` switches tuning off |
 | `NEXT_PUBLIC_API_URL` | frontend | Backend address, set at build time |
@@ -88,9 +95,10 @@ Frontend on http://localhost:3000, API on http://localhost:8000. Data lives in t
 ## API
 | Method and path | Purpose |
 |---|---|
-| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Accounts |
+| `POST /api/auth/register`, `POST /api/auth/verify-email`, `POST /api/auth/resend-verification`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Verified accounts and cookie sessions |
 | `POST /api/runs` | Upload a CSV and get its profile |
 | `POST /api/runs/{id}/train` | Start training in the background |
+| `POST /api/runs/{id}/what-if` | Create a comparable feature-removal experiment from a completed run |
 | `GET /api/runs/{id}` | Progress, timeline steps and results |
 | `GET /api/runs/{id}/events` | The same data as a live server-sent event stream |
 | `GET /api/runs`, `DELETE /api/runs/{id}` | History and deletion |
@@ -99,12 +107,14 @@ Frontend on http://localhost:3000, API on http://localhost:8000. Data lives in t
 
 Interactive docs at `/docs` when the backend runs.
 
+The browser uses HttpOnly session cookies and sends the CSRF token automatically. For a separate frontend/API deployment, allow the exact frontend origin in `ALLOWED_ORIGINS` and use HTTPS.
+
 ## Benchmark
 ```bash
 pip install -r benchmark/requirements.txt
-python benchmark/run_benchmark.py --seeds 3 --budget 15
+python benchmark/run_benchmark.py --seeds 5 --budget 8 --max-rows 3000
 ```
-On 12 public datasets (3 splits each) it lands roughly on par with FLAML under the same time budget: 5 wins and 7 losses, median score difference -0.006, and within 0.02 of the best method on 9 of 12. The extra value is the Reviewer and Red team on top, not a higher score. Results, the protocol and the caveats are in [benchmark/RESULTS.md](benchmark/RESULTS.md). The benchmark needs FLAML, which pulls in compiled packages, so it is kept out of the app's own requirements.
+Across 16 public datasets and 5 splits per dataset, the system beats FLAML on 9 dataset averages, ties on 2 and loses on 5; the median score difference is +0.009, and it is within 0.02 of the best method on 13 datasets. Treat these small-sample comparisons cautiously; the added value is the Reviewer and Red team, not just raw score. Results, protocol and caveats are in [benchmark/RESULTS.md](benchmark/RESULTS.md). The benchmark needs FLAML, which pulls in compiled packages, so it is kept out of the app's own requirements.
 
 ## Tests and CI
 ```bash
@@ -118,16 +128,16 @@ A common free setup: frontend on Vercel, backend from `backend/Dockerfile` on Re
 1. Create the database and copy its URL into `DATABASE_URL` (add `psycopg[binary]` to `requirements.txt`).
 2. Deploy the backend with `ENV=production`, `SECRET_KEY`, `ALLOWED_ORIGINS` (your frontend URL), `DATABASE_URL` and an AI key.
 3. Deploy the frontend with `NEXT_PUBLIC_API_URL` set to the backend URL, then add that frontend URL to `ALLOWED_ORIGINS`.
-4. Uploaded files and models live on the server disk. On hosts with ephemeral disks they disappear on redeploy, so attach a persistent disk or move artifacts to object storage.
+4. Uploaded CSVs and metadata live on the server disk. Set `ARTIFACT_STORAGE=s3`, `ARTIFACT_BUCKET`, and `AWS_REGION` (plus credentials or an instance role) to store downloadable artifacts in an S3-compatible bucket. Raw uploads still need a persistent disk or separate object-storage configuration.
 5. Training runs in a background thread. Small free instances may run out of memory on large files, so keep `MAX_BYTES` modest.
 
 ## Security notes
-- Passwords are hashed with scrypt. Login tokens are signed JWTs valid for 7 days and kept in the browser's local storage, which a cross-site scripting bug could expose. Moving to httpOnly cookies is the next hardening step.
+- Passwords are hashed with scrypt. Browser sessions use seven-day HttpOnly JWT cookies, with a session-bound CSRF token required for cookie-authenticated mutations. Production cookies are Secure; configure the frontend origin in `ALLOWED_ORIGINS`.
 - Every run is tied to its owner. Other users get a 404, not a 403.
 - Limits: 20 MB per file, a daily upload cap per user and one training at a time per user.
 - Each open live stream holds one server thread until the run ends, which is fine for a demo but would need an async design for heavy traffic.
-- There is no email verification or password reset yet.
-- The AI provider receives only column names, types, summary statistics and class labels, never raw rows.
+- New accounts must verify their email. SMTP is required for registration in production; development mode exposes a verification code only when SMTP is not configured. Password reset is not implemented yet.
+- The AI provider receives column names, types, summary statistics and class labels, never raw rows. What-if requests also send the user's question and available feature names to the configured provider.
 
 ## Structure
 ```
@@ -145,4 +155,4 @@ frontend/                  Next.js (App Router) and Tailwind
 ```
 
 ## Roadmap
-httpOnly cookies, email verification, object storage for artifacts, a what-if chat that re-runs only the affected steps, and a larger benchmark with more datasets and splits.
+Password reset, a deployed public demo, and a still broader benchmark with more public datasets and repeated splits.
